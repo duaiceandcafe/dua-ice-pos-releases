@@ -962,6 +962,81 @@ const NOTIF = {
 })();
 
 // ============================================================
+// WEB PUSH — REAL notifications to the owner's iPhone
+// Works even when the app is closed or the phone is locked.
+// The device that performs a sale/shift action calls the Supabase
+// "send-push" edge function, which pushes to every subscribed (Admin) device.
+// ============================================================
+const VAPID_PUBLIC_KEY = 'BHzBhHJtvjkNM6y9kkylrk3vO4xit-xp_p5Heww0EBKaVZ_IY_58Xi37fG80Nm-6bndsfg1Y4JS3r6srMeAJDQc';
+const PUSH_SEND_URL = SUPABASE_URL + '/functions/v1/send-push';
+const PUSH = {
+  supported() {
+    return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+  },
+  _urlB64ToUint8Array(base64String) {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const raw = atob(base64);
+    const arr = new Uint8Array(raw.length);
+    for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+    return arr;
+  },
+  // Subscribe THIS device (Admin only) and store the subscription in Supabase
+  async subscribe() {
+    if (!SYNC_ENABLED || !this.supported()) return false;
+    if (Notification.permission !== 'granted') return false;
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      let sub = await reg.pushManager.getSubscription();
+      if (!sub) {
+        sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: this._urlB64ToUint8Array(VAPID_PUBLIC_KEY)
+        });
+      }
+      await this._saveSubscription(sub);
+      console.log('[Push] subscribed & saved');
+      return true;
+    } catch (e) { console.warn('[Push] subscribe failed', e); return false; }
+  },
+  async _saveSubscription(sub) {
+    const json = sub.toJSON();
+    const row = {
+      endpoint: json.endpoint,
+      subscription: json,
+      user_id: String(state.currentUser?.id || ''),
+      user_name: state.currentUser?.name || '',
+      updated_at: new Date().toISOString()
+    };
+    await fetch(SUPABASE_URL + '/rest/v1/push_subscriptions?on_conflict=endpoint', {
+      method: 'POST',
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: 'Bearer ' + SUPABASE_ANON_KEY,
+        'Content-Type': 'application/json',
+        Prefer: 'resolution=merge-duplicates'
+      },
+      body: JSON.stringify(row)
+    });
+  },
+  // Trigger a push to all subscribed (Admin) devices. Called by the acting device.
+  send({ title, body, type, url }) {
+    if (!SYNC_ENABLED) return;
+    try {
+      fetch(PUSH_SEND_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: 'Bearer ' + SUPABASE_ANON_KEY
+        },
+        body: JSON.stringify({ title, body, type: type || 'sale', url: url || '/' })
+      }).catch(e => console.warn('[Push] send failed', e));
+    } catch (e) { console.warn('[Push] send error', e); }
+  }
+};
+
+// ============================================================
 // EVENT DETECTOR — watches realtime updates from cloud
 // When sales array grows or a shift changes status → notify Admin
 // ============================================================
@@ -1052,6 +1127,13 @@ function checkEodSummary() {
     body: `${sales.length} sales · ${items} items · Rs ${total.toFixed(0)} total\n💵 Cash: Rs ${cash.toFixed(0)} · 💳 Card: Rs ${card.toFixed(0)}`,
     type: 'summary'
   });
+  try {
+    PUSH.send({
+      title: `📊 Daily Summary — ${now.toLocaleDateString('en-GB')}`,
+      body: `${sales.length} sales · ${items} items · Rs ${total.toFixed(0)} · 💵 Rs ${cash.toFixed(0)} · 💳 Rs ${card.toFixed(0)}`,
+      type: 'summary'
+    });
+  } catch(e) {}
   LS.set('tpv_last_eod', today);
   localStorage.setItem('tpv_last_eod', today); // ensure direct write too
 }
@@ -1764,7 +1846,10 @@ function doLogin() {
   try {
     NotifWatcher.init();
     if (NOTIF.isAdmin()) {
-      NOTIF.requestPermission().then(ok => console.log('[Notif] permission:', ok));
+      NOTIF.requestPermission().then(ok => {
+        console.log('[Notif] permission:', ok);
+        if (ok) PUSH.subscribe(); // register iPhone for real push (locked / closed)
+      });
       setTimeout(() => checkEodSummary(), 3000);
     }
   } catch(e) { console.warn('[Notif] init failed', e); }
@@ -2783,6 +2868,16 @@ function confirmSale(total) {
   sales.push(sale);
   LS.set('tpv_sales', sales);
 
+  // Push REAL notification to the owner's iPhone (works when app closed)
+  try {
+    const _items = sale.items.reduce((a,i)=>a+(i.quantity||1),0);
+    PUSH.send({
+      title: '💰 New Sale',
+      body: `Rs ${finalTotal.toFixed(0)} · ${_items} item${_items!==1?'s':''} · by ${state.currentUser.name}`,
+      type: 'sale'
+    });
+  } catch(e) {}
+
   // Update shift
   if (state.activeShift) {
     const shifts = LS.get('tpv_shifts') || [];
@@ -3672,6 +3767,13 @@ function confirmOpenShift() {
   document.querySelector('.modal-overlay')?.remove();
   updateShiftBadge();
   toast('Shift opened successfully', 'success');
+  try {
+    PUSH.send({
+      title: '🔓 Shift Opened',
+      body: `${shift.cashierName} opened shift · Float: Rs ${(float||0).toFixed(0)}`,
+      type: 'shift-open'
+    });
+  } catch(e) {}
 }
 
 function closeShift(forLogout) {
@@ -3748,6 +3850,17 @@ function confirmCloseShift() {
   document.querySelector('.modal-overlay')?.remove();
   updateShiftBadge();
   toast('Shift closed successfully', 'success');
+  try {
+    if (sh) {
+      const disc = sh.discrepancy;
+      const discTxt = (disc === null || disc === undefined) ? '' : (Math.abs(disc) < 0.01 ? ' · ✅ Perfect cash' : (disc < 0 ? ` · ⚠️ Short Rs ${Math.abs(disc).toFixed(0)}` : ` · Over Rs ${disc.toFixed(0)}`));
+      PUSH.send({
+        title: '🔒 Shift Closed',
+        body: `${sh.cashierName || state.currentUser?.name || 'Cashier'} · Sales: Rs ${(sh.totalSales||0).toFixed(0)} · ${sh.totalTickets||0} tickets${discTxt}`,
+        type: 'shift-close'
+      });
+    }
+  } catch(e) {}
   if (window._closeShiftForLogout) {
     window._closeShiftForLogout = false;
     setTimeout(() => doLogout(), 300);
@@ -5934,7 +6047,8 @@ function renderSettings(container) {
 
           <div style="background:#f8f9fa;border-radius:10px;padding:14px;margin-bottom:16px">
             <div style="font-size:13px;color:#555;margin-bottom:6px"><strong>Browser permission:</strong> ${permLabel}</div>
-            ${perm !== 'granted' && perm !== 'unsupported' ? '<button class="btn btn-sm btn-primary" onclick="NOTIF.requestPermission().then(()=>switchSettingsTab(\'notif\'))">🔔 Enable Notifications</button>' : ''}
+            ${perm !== 'granted' && perm !== 'unsupported' ? '<button class="btn btn-sm btn-primary" onclick="NOTIF.requestPermission().then(ok=>{if(ok)PUSH.subscribe();switchSettingsTab(\'notif\')})">🔔 Enable Notifications</button>' : ''}
+            ${perm === 'granted' ? '<button class="btn btn-sm btn-primary" onclick="PUSH.subscribe().then(ok=>toast(ok?\'📲 iPhone registered for push ✅\':\'Push not available on this device\', ok?\'success\':\'warning\'))">📲 Register this device for Push</button>' : ''}
           </div>
 
           <div style="display:flex;align-items:center;justify-content:space-between;padding:14px;border:1px solid #eee;border-radius:10px;margin-bottom:10px">
@@ -5975,8 +6089,9 @@ function renderSettings(container) {
             <button class="btn btn-sm btn-secondary" onclick="NOTIF.show({title:'🔓 Test Shift Open',body:'Sarah opened shift · Float: Rs 1000',type:'shift-open'})">Test shift open</button>
             <button class="btn btn-sm btn-secondary" onclick="NOTIF.show({title:'🔒 Test Shift Close',body:'Sarah closed · Rs 8400 · 24 tickets · ✅ Perfect cash',type:'shift-close'})">Test shift close</button>
             <button class="btn btn-sm btn-secondary" onclick="NOTIF.show({title:'📊 Test Daily Summary',body:'47 sales · 124 items · Rs 18,450 total',type:'summary'})">Test summary</button>
+            <button class="btn btn-sm btn-success" onclick="PUSH.send({title:'📤 Test Push',body:'If you see this with the app CLOSED, push works! 🎉',type:'sale'});toast('Test push sent — close the app/lock the phone to verify','success',5000)">📤 Test push to iPhone</button>
           </div>
-          <p style="font-size:11px;color:#aaa;margin-top:14px">📱 On iPhone: install the PWA from Safari (Share → Add to Home Screen) for best notification experience. Notifications only fire on Admin devices.</p>
+          <p style="font-size:11px;color:#aaa;margin-top:14px">📱 On iPhone: you MUST install the PWA (Share → Add to Home Screen) and open it from the Home Screen icon for real push to work. Then tap "Register this device for Push". Notifications only fire on Admin devices.</p>
         </div>
         <style>.switch{position:relative;display:inline-block;width:48px;height:26px}.switch input{opacity:0;width:0;height:0}.slider{position:absolute;cursor:pointer;inset:0;background:#ccc;transition:.3s;border-radius:26px}.slider:before{position:absolute;content:"";height:20px;width:20px;left:3px;bottom:3px;background:#fff;transition:.3s;border-radius:50%}input:checked+.slider{background:#1a7a5e}input:checked+.slider:before{transform:translateX(22px)}</style>`;
     } else if (tab === 'danger') {

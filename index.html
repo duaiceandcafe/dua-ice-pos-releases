@@ -1043,15 +1043,28 @@ const PUSH = {
 const NotifWatcher = {
   lastSeenSaleIds: null,
   lastSeenShiftStates: null,
+  lastSeenRefunds: null,
   init() {
     // Snapshot what's already on the device — don't notify for those
     this.lastSeenSaleIds = new Set((LS.get('tpv_sales') || []).map(s => s.id));
+    this.lastSeenRefunds = new Set((LS.get('tpv_sales') || []).filter(s => s.refunded).map(s => s.id));
     this.lastSeenShiftStates = {};
     (LS.get('tpv_shifts') || []).forEach(sh => { this.lastSeenShiftStates[sh.id] = sh.status; });
   },
   onSalesUpdated(salesArr) {
     if (!NOTIF.isAdmin() || !this.lastSeenSaleIds) return;
     salesArr.forEach(sale => {
+      // A refund just happened on this sale (may be an existing sale)
+      if (sale.refunded && this.lastSeenRefunds && !this.lastSeenRefunds.has(sale.id)) {
+        this.lastSeenRefunds.add(sale.id);
+        const rItems = (sale.refundedItems || []).reduce((a,i) => a + (i.quantity||1), 0);
+        NOTIF.show({
+          title: sale.refundType === 'full' ? '↩️ Full Refund' : '✂️ Partial Refund',
+          body: `Rs ${(sale.refundAmount||0).toFixed(0)} refunded${rItems?` · ${rItems} item${rItems!==1?'s':''}`:''} · by ${sale.refundedByName || sale.cashierName || 'Cashier'}`,
+          type: 'sale'
+        });
+      }
+      // A brand-new sale
       if (this.lastSeenSaleIds.has(sale.id)) return;
       this.lastSeenSaleIds.add(sale.id);
       if (sale.status === 'completed') {
@@ -1059,12 +1072,6 @@ const NotifWatcher = {
         NOTIF.show({
           title: '💰 New Sale',
           body: `Rs ${(sale.total||0).toFixed(0)} · ${itemsCount} item${itemsCount!==1?'s':''} · by ${sale.cashierName || 'Cashier'}`,
-          type: 'sale'
-        });
-      } else if (sale.status === 'refunded') {
-        NOTIF.show({
-          title: '↩️ Refund Processed',
-          body: `Rs ${(sale.total||0).toFixed(0)} refunded by ${sale.cashierName || 'Cashier'}`,
           type: 'sale'
         });
       }
@@ -5362,6 +5369,9 @@ window.openRefund = function(id) {
     </div>
   </div>`);
   window._refundSale = sale;
+  // Default to Full Refund so the full amount shows immediately
+  window._refundType = null;
+  setRefundType('full', id);
 };
 
 window.setRefundType = function(type, id) {
@@ -5390,6 +5400,14 @@ window.setRefundType = function(type, id) {
 window.calcRefundTotal = function() {
   const sale = window._refundSale;
   if (!sale) return;
+  const totalEl = document.getElementById('rf-total');
+  const btn = document.getElementById('rf-confirm');
+  // Full refund → always the full original total, shown immediately
+  if (window._refundType === 'full') {
+    if (totalEl) totalEl.textContent = fmt(sale.total);
+    if (btn) btn.disabled = false;
+    return;
+  }
   let total = 0;
   let anyItem = false;
   document.querySelectorAll('.refund-qty').forEach(inp => {
@@ -5401,9 +5419,7 @@ window.calcRefundTotal = function() {
       total += item.unitPrice * qty;
     }
   });
-  const totalEl = document.getElementById('rf-total');
   if (totalEl) totalEl.textContent = fmt(total);
-  const btn = document.getElementById('rf-confirm');
   if (btn) btn.disabled = !anyItem;
 };
 
@@ -5417,18 +5433,26 @@ window.confirmRefund = function(id) {
   // Collect refunded items
   const refundedItems = [];
   let refundAmount = 0;
-  document.querySelectorAll('.refund-qty').forEach(inp => {
-    const idx = parseInt(inp.dataset.idx);
-    const qty = parseInt(inp.value) || 0;
-    if (qty > 0) {
-      const it = sale.items[idx];
-      refundedItems.push({ idx, name: it.name, quantity: qty, unitPrice: it.unitPrice, subtotal: it.unitPrice * qty, scoops: it.scoops||[] });
-      refundAmount += it.unitPrice * qty;
-    }
-  });
+  if (window._refundType === 'full') {
+    // Full refund → return every item and refund the exact original total
+    sale.items.forEach((it, idx) => {
+      refundedItems.push({ idx, name: it.name, quantity: it.quantity, unitPrice: it.unitPrice, subtotal: it.unitPrice * it.quantity, scoops: it.scoops||[] });
+    });
+    refundAmount = sale.total;
+  } else {
+    document.querySelectorAll('.refund-qty').forEach(inp => {
+      const idx = parseInt(inp.dataset.idx);
+      const qty = parseInt(inp.value) || 0;
+      if (qty > 0) {
+        const it = sale.items[idx];
+        refundedItems.push({ idx, name: it.name, quantity: qty, unitPrice: it.unitPrice, subtotal: it.unitPrice * qty, scoops: it.scoops||[] });
+        refundAmount += it.unitPrice * qty;
+      }
+    });
+  }
   if (refundAmount <= 0) { toast('Select items to refund', 'error'); return; }
 
-  const refundType = (refundAmount >= sale.total) ? 'full' : 'partial';
+  const refundType = window._refundType === 'full' ? 'full' : ((refundAmount >= sale.total) ? 'full' : 'partial');
 
   // Record refund on sale
   sale.refunded = true;
@@ -5477,6 +5501,15 @@ window.confirmRefund = function(id) {
   document.querySelector('.modal-overlay')?.remove();
   navigate('invoices');
   toast(`💸 Refund processed: ${fmt(refundAmount)}`, 'success', 3500);
+  // Notify owner's iPhone (push) about the refund
+  try {
+    const _items = refundedItems.reduce((a,i)=>a+(i.quantity||1),0);
+    PUSH.send({
+      title: refundType === 'full' ? '↩️ Full Refund' : '✂️ Partial Refund',
+      body: `Rs ${refundAmount.toFixed(0)} refunded · ${_items} item${_items!==1?'s':''} · by ${state.currentUser?.name||'Cashier'}`,
+      type: 'sale'
+    });
+  } catch(e) {}
   // Auto-print a refund receipt
   setTimeout(() => printRefundReceipt(sale, refundedItems, refundAmount, reason), 400);
 };

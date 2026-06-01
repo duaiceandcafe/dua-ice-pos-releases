@@ -8723,10 +8723,36 @@ function startApp() {
   // Start Supabase sync in background (non-blocking)
   // Wait a tick for the Supabase library to finish loading from CDN
   setTimeout(() => { initSupabaseSync().catch(e => console.error(e)); }, 800);
-  // Register service worker for PWA offline support
+  // Register service worker for PWA offline support + AUTO-UPDATE
   if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+    let _reloadingForUpdate = false;
+    const _hadController = !!navigator.serviceWorker.controller; // false on first install
+    // When a NEW service worker takes control (an update), reload once.
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (_reloadingForUpdate || !_hadController) return; // don't reload on first install
+      _reloadingForUpdate = true;
+      console.log('[PWA] New version active — reloading');
+      window.location.reload();
+    });
     navigator.serviceWorker.register('service-worker.js')
-      .then(() => console.log('[PWA] Service worker registered'))
+      .then(reg => {
+        console.log('[PWA] Service worker registered');
+        // A new version was found → activate it immediately
+        reg.addEventListener('updatefound', () => {
+          const sw = reg.installing;
+          if (!sw) return;
+          sw.addEventListener('statechange', () => {
+            if (sw.state === 'installed' && navigator.serviceWorker.controller) {
+              sw.postMessage({ type: 'SKIP_WAITING' }); // -> triggers controllerchange -> reload
+            }
+          });
+        });
+        // Check for updates now, when the app regains focus, and every 30 min
+        const checkForUpdate = () => reg.update().catch(()=>{});
+        checkForUpdate();
+        document.addEventListener('visibilitychange', () => { if (!document.hidden) checkForUpdate(); });
+        setInterval(checkForUpdate, 30 * 60 * 1000);
+      })
       .catch(e => console.warn('[PWA] SW registration failed:', e.message));
   }
 }

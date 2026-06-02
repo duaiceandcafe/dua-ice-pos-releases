@@ -3193,7 +3193,9 @@ const ESCPOS = {
   boldOff: () => new Uint8Array([0x1B, 0x45, 0]),
   doubleOn: () => new Uint8Array([0x1D, 0x21, 0x11]),
   doubleOff: () => new Uint8Array([0x1D, 0x21, 0]),
-  cut: () => new Uint8Array([0x1D, 0x56, 0x42, 0x00]),
+  // Feed the paper past the cutter, then full-cut. GS V 0 (full cut) is the most
+  // widely supported command on generic 58/80mm USB/Bluetooth thermal printers.
+  cut: () => new Uint8Array([0x1B, 0x64, 0x04, 0x1D, 0x56, 0x00]),
   feed: (n=3) => new Uint8Array([0x1B, 0x64, n]),
   drawer: () => new Uint8Array([0x1B, 0x70, 0x00, 0x19, 0xFA]),
   text: (s) => new TextEncoder().encode(s)
@@ -3517,7 +3519,7 @@ function sendBrowserPrint(sale, store, prCfg) {
     html,body{margin:0;padding:0;background:#fff;color:#000}
     /* Heavy, thick-stroke monospace fonts that print clearly on thermal printers */
     body{font-family:'Consolas','Andale Mono','DejaVu Sans Mono','Liberation Mono','Courier New',monospace;font-size:12px;line-height:1.4;color:#000;font-weight:700;-webkit-font-smoothing:antialiased;text-rendering:geometricPrecision}
-    .ticket{width:${w};max-width:${w};padding:2mm 2mm 2mm 5mm;background:#fff;page-break-after:always;margin:0 auto;overflow:hidden}
+    .ticket{width:${w};max-width:${w};padding:1.5mm 3mm 1.5mm 2mm;background:#fff;page-break-after:always;margin:0 auto;overflow:hidden;zoom:0.9}
     .ticket:last-child{page-break-after:auto}
     .cut-marker{text-align:center;font-size:9px;color:#000;letter-spacing:1px;margin:3px 0 2px;font-weight:900;border-top:1px dashed #000;padding-top:3px}
     .feed-space{height:3mm;display:block}
@@ -3527,7 +3529,7 @@ function sendBrowserPrint(sale, store, prCfg) {
       html,body{margin:0;padding:0;width:${w};color:#000}
       body{-webkit-print-color-adjust:exact;print-color-adjust:exact;color:#000;font-weight:700;font-synthesis:none}
       *{color:#000 !important}
-      .ticket{margin:0 auto;padding:2mm 2mm 2mm 5mm;width:${w};max-width:${w}}
+      .ticket{margin:0 auto;padding:1.5mm 3mm 1.5mm 2mm;width:${w};max-width:${w};zoom:0.9}
     }
   </style></head><body>
     <div class="ticket">

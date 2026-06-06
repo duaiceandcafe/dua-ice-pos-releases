@@ -3408,28 +3408,19 @@ function sendBrowserPrint(sale, store, prCfg) {
       const pad = Math.max(1, totalCols - label.length - value.length);
       return label + ' '.repeat(pad) + value;
     };
-    // Compact monospace line style (reused for all aligned rows)
-    const ML = "font-family:'Courier New',monospace;font-size:10px;white-space:pre";
-    // Column widths that add up EXACTLY to COLS so header + rows line up perfectly
-    const NAMEW = prCfg.paper === '58mm' ? 16 : 22;
-    const QTYW  = prCfg.paper === '58mm' ? 4 : 6;
-    const AMTW  = COLS - NAMEW - QTYW;
-    // Item row builder — name left, qty + amount right-aligned in fixed columns
+    // Monospace text style + FULL-WIDTH separators (border reaches both edges of the paper)
+    const ML = "font-family:'Courier New',monospace;font-size:10px";
+    const sepThin = '<div style="border-top:1px dashed #000;margin:3px 0"></div>';
+    const QW = '30px', AW = '74px'; // fixed qty / amount columns; the name takes the rest
+    // Item row using flex → always fits the paper width exactly (never cut off on the printer)
     const itemRow = (name, qty, amt, scoops) => {
       const qStr = Number.isInteger(qty) ? String(qty) : qty.toFixed(2);
-      const aStr = amt.toFixed(2);
-      const tail = qStr.padStart(QTYW) + aStr.padStart(AMTW);
-      let rows = '';
-      if (name.length <= NAMEW) {
-        rows = `<div style="${ML}">${escHtml(name.padEnd(NAMEW))}${escHtml(tail)}</div>`;
-      } else {
-        rows = `<div style="${ML}">${escHtml(name.substring(0, NAMEW).padEnd(NAMEW))}${escHtml(tail)}</div>`;
-        for (let i = NAMEW; i < name.length; i += NAMEW) {
-          rows += `<div style="${ML}">${escHtml(name.substring(i, i + NAMEW))}</div>`;
-        }
-      }
-      if (scoops) rows += `<div style="${ML};font-size:9px;color:#444">${'  ' + escHtml(scoops)}</div>`;
-      return rows;
+      let r = `<div style="display:flex;${ML};align-items:flex-start">`
+        + `<span style="flex:1;padding-right:4px;word-break:break-word">${escHtml(name)}</span>`
+        + `<span style="width:${QW};text-align:right;flex:none">${escHtml(qStr)}</span>`
+        + `<span style="width:${AW};text-align:right;flex:none">Rs ${amt.toFixed(2)}</span></div>`;
+      if (scoops) r += `<div style="${ML};font-size:9px;color:#444;padding-left:6px">${escHtml(scoops)}</div>`;
+      return r;
     };
     const itemRows = sale.items.map((it) => {
       const flavorTxt = it.scoops?.length ? '• ' + it.scoops.map(s => s.flavorName).join(', ') : '';
@@ -3476,22 +3467,24 @@ function sendBrowserPrint(sale, store, prCfg) {
         </div>
       </div>
       <div style="text-align:center;font-size:9px">${escHtml(dateShort)}</div>
-      ${dashLine}
-      ${ti.showCashier!==false?`<div style="${ML}">${escHtml(formatLabel('Created By', (sale.cashierName||'admin').toLowerCase()))}</div>`:''}
-      <div style="${ML};font-weight:700">${'ITEM'.padEnd(NAMEW) + 'QTY'.padStart(QTYW) + 'AMT'.padStart(AMTW)}</div>
-      ${dashLine}
+      ${sepThin}
+      ${ti.showCashier!==false?`<div style="display:flex;justify-content:space-between;${ML}"><span>Created By</span><span>${escHtml((sale.cashierName||'admin').toLowerCase())}</span></div>`:''}
+      ${ti.showInvoice!==false?`<div style="display:flex;justify-content:space-between;${ML}"><span>Invoice</span><span>${escHtml(sale.invoiceNumber||'')}</span></div>`:''}
+      ${sepThin}
+      <div style="display:flex;${ML};font-weight:700"><span style="flex:1">ITEM</span><span style="width:${QW};text-align:right">QTY</span><span style="width:${AW};text-align:right">AMT</span></div>
+      ${sepThin}
       ${itemRows}
-      ${dashLine}
+      ${sepThin}
       <div style="display:flex;justify-content:space-between;${ML}"><span>Subtotal</span><span>Rs ${parseFloat(sale.subtotal||0).toFixed(2)}</span></div>
       ${sale.discount?`<div style="display:flex;justify-content:space-between;${ML};color:#c0392b"><span>Discount</span><span>-Rs ${parseFloat(sale.discount||0).toFixed(2)}</span></div>`:''}
       <div style="display:flex;justify-content:space-between;font-family:'Courier New',monospace;font-weight:900;font-size:12px;margin-top:1px"><span>TOTAL</span><span>Rs ${parseFloat(sale.total||0).toFixed(2)}</span></div>
       ${sale.paymentMethod==='cash' ? `
       <div style="display:flex;justify-content:space-between;${ML}"><span>Amt Paid</span><span>Rs ${parseFloat(sale.cashGiven||0).toFixed(2)}</span></div>
       <div style="display:flex;justify-content:space-between;${ML}"><span>Change</span><span>Rs ${parseFloat(sale.change||0).toFixed(2)}</span></div>` : ''}
-      ${dashLine}
+      ${sepThin}
       <div style="${ML};font-weight:700;letter-spacing:1px">PAYMENT DETAILS</div>
       <div style="display:flex;justify-content:space-between;${ML}"><span>${escHtml(paymentLabel)}</span><span>Rs ${parseFloat(sale.total||0).toFixed(2)}</span></div>
-      ${dashLine}
+      ${sepThin}
       <div style="text-align:center;font-size:9px;line-height:1.3;margin:3px 0">${escHtml(ti.footerMessage||'Thank you for visiting Dua Ice & Cafe!')}</div>
       ${ti.qrUrl?`<div style="text-align:center;font-size:8px;word-break:break-all">${escHtml(ti.qrUrl)}</div>`:''}
       ${ti.showQr!==false && qrSrc?`<div style="text-align:center;margin-top:4px"><img src="${qrSrc}" style="width:${ti.qrSize||80}px;height:${ti.qrSize||80}px"></div>

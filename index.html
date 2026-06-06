@@ -6143,8 +6143,8 @@ function renderSettings(container) {
           <div class="divider"></div>
 
           <div style="font-weight:700;margin-bottom:6px;color:#c0392b">💀 Full reset</div>
-          <button class="btn btn-danger w-full" style="padding:16px;font-size:14px;font-weight:700" onclick="startResetFlow('all')">🔴 RESET EVERYTHING (factory defaults)</button>
-          <div style="font-size:11px;color:var(--text-sec);margin-top:6px;text-align:center">Wipes all sales, shifts, customers, products, settings → returns to a fresh install</div>
+          <button class="btn btn-danger w-full" style="padding:16px;font-size:14px;font-weight:700" onclick="startResetFlow('all')">🔴 RESET ALL SALES & DATA TO ZERO</button>
+          <div style="font-size:11px;color:var(--text-sec);margin-top:6px;text-align:center">Zeroes all sales, invoices, refunds, shifts, customers, pending orders & dashboard — on every device. <strong>Keeps your users, passwords and product menu.</strong></div>
         </div>`;
     }
   };
@@ -6176,7 +6176,7 @@ window.startResetFlow = function(scope) {
     shifts: { title: 'Reset All Shifts', desc: 'Deletes all shift history and cash movements. Active shift will be closed.', keys: ['tpv_shifts'] },
     customers: { title: 'Reset Customers', desc: 'Deletes all customer records.', keys: ['tpv_customers'] },
     orders: { title: 'Reset Pending Orders', desc: 'Clears the pending orders queue.', keys: ['tpv_pending_orders','tpv_last_called'] },
-    all: { title: 'FULL FACTORY RESET', desc: 'Deletes EVERYTHING: sales, shifts, customers, products, categories, flavors, suppliers, settings, users (except admin). The app returns to first-install state.', keys: '__ALL__' }
+    all: { title: 'RESET ALL DATA TO ZERO', desc: 'Zeroes ALL sales, invoices, refunds, shifts, customers, pending orders and the dashboard — on every device. Your USERS (names & passwords) and your product MENU are kept untouched.', keys: '__ALL__' }
   };
   const cfg = labels[scope] || labels.sales;
   const isFullReset = scope === 'all';
@@ -6240,41 +6240,49 @@ window.resetPhase3 = function(scope) {
   setTimeout(() => document.getElementById('reset-confirm-input')?.focus(), 100);
 };
 
-window.executeReset = function(scope) {
-  const scopes = {
-    sales: ['tpv_sales','tpv_pending_orders','tpv_numbering','tpv_last_called'],
-    shifts: ['tpv_shifts'],
-    customers: ['tpv_customers'],
-    orders: ['tpv_pending_orders','tpv_last_called']
+window.executeReset = async function(scope) {
+  // The "empty/zero" value each resettable key should get
+  const emptyFor = (k) => {
+    if (k === 'tpv_numbering') return { currentOrder: 0, currentInvoice: 0, invoiceYear: new Date().getFullYear() };
+    if (k === 'tpv_last_eod') return '';
+    return []; // sales, shifts, customers, pending orders → empty arrays
   };
-
-  if (scope === 'all') {
-    // Wipe everything and reload (initData will repopulate defaults)
-    const keysToRemove = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (k && k.startsWith('tpv_')) keysToRemove.push(k);
-    }
-    keysToRemove.forEach(k => localStorage.removeItem(k));
-    toast('Full reset complete. Reloading...', 'success', 1500);
-    setTimeout(() => location.reload(), 1500);
-    return;
-  }
-
+  const scopes = {
+    sales:     ['tpv_sales','tpv_pending_orders','tpv_numbering','tpv_last_eod'],
+    shifts:    ['tpv_shifts'],
+    customers: ['tpv_customers'],
+    orders:    ['tpv_pending_orders'],
+    // FULL reset → zero out ALL transactional data (sales, invoices, refunds,
+    // shifts, customers, pending orders, numbering, dashboard).
+    // NEVER touches tpv_config (users / passwords / store settings) or the menu
+    // (products, categories, flavors, supplies, coupons, campaigns).
+    all:       ['tpv_sales','tpv_pending_orders','tpv_shifts','tpv_customers','tpv_numbering','tpv_last_eod']
+  };
   const keys = scopes[scope] || [];
-  keys.forEach(k => {
-    if (k === 'tpv_sales') localStorage.setItem(k, '[]');
-    else if (k === 'tpv_shifts') { localStorage.setItem(k, '[]'); state.activeShift = null; }
-    else if (k === 'tpv_customers') localStorage.setItem(k, '[]');
-    else if (k === 'tpv_pending_orders') localStorage.setItem(k, '[]');
-    else if (k === 'tpv_numbering') localStorage.setItem(k, JSON.stringify({ currentOrder: 0, currentInvoice: 0, invoiceYear: new Date().getFullYear() }));
-    else localStorage.removeItem(k);
-  });
+
+  // 1) Clear locally
+  keys.forEach(k => localStorage.setItem(k, JSON.stringify(emptyFor(k))));
+  if (keys.includes('tpv_shifts')) state.activeShift = null;
+  localStorage.removeItem('tpv_last_called');
+
+  // 2) Clear in the CLOUD too — otherwise the data syncs straight back on reload.
+  //    This also propagates the reset to every other device automatically.
+  let cloudOk = true;
+  try {
+    if (typeof pushToCloud === 'function' && typeof supabaseClient !== 'undefined' && supabaseClient) {
+      await Promise.all(keys.map(k => pushToCloud(k, emptyFor(k))));
+    } else {
+      cloudOk = false; // offline — local cleared, but cloud will restore on next sync
+    }
+  } catch(e) { cloudOk = false; console.warn('[Reset] cloud clear failed', e); }
 
   document.querySelector('.modal-overlay')?.remove();
-  toast(`✅ ${scope.charAt(0).toUpperCase()+scope.slice(1)} reset complete`, 'success', 2500);
-  // Reload after 1s so the UI reflects the cleared state
-  setTimeout(() => location.reload(), 1200);
+  if (cloudOk) {
+    toast('✅ Reset complete (synced). Reloading...', 'success', 1600);
+  } else {
+    toast('⚠️ Reset done locally, but you are OFFLINE — connect to the internet and reset again so it clears the cloud.', 'warning', 6000);
+  }
+  setTimeout(() => location.reload(), cloudOk ? 1500 : 3000);
 };
 
 // ============================================================

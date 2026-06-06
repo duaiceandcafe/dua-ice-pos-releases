@@ -3049,79 +3049,62 @@ function openPrintModal(sale) {
       const pad = COLS - labelCol - valuePart.length;
       return labelPart + ': ' + ' '.repeat(Math.max(0, pad - 2)) + value;
     };
-    const itemRow = (n, name, qty, amt, scoops) => {
-      const nameCol = 26;
-      const qtyAmt = String(qty).padStart(6) + ('Rs ' + amt).padStart(11);
-      let rows = '';
-      if (name.length <= nameCol) {
-        rows = `<div style="font-family:'Courier New',monospace;font-size:11px;white-space:pre">${escHtml(name.padEnd(nameCol))}${escHtml(qtyAmt)}</div>`;
-      } else {
-        rows = `<div style="font-family:'Courier New',monospace;font-size:11px;white-space:pre">${escHtml(name.substring(0, nameCol))}${escHtml(qtyAmt)}</div>`;
-        const rest = name.substring(nameCol);
-        for (let i = 0; i < rest.length; i += nameCol) {
-          rows += `<div style="font-family:'Courier New',monospace;font-size:11px;white-space:pre">${escHtml(rest.substring(i, i + nameCol))}</div>`;
-        }
-      }
-      if (scoops) rows += `<div style="font-family:'Courier New',monospace;font-size:10px;color:#444;white-space:pre">${'  ' + escHtml(scoops)}</div>`;
-      return rows;
+    const ML = "font-family:'Courier New',monospace;font-size:10px";
+    const sepThin = '<div style="border-top:1px dashed #000;margin:3px 0"></div>';
+    const QW = '30px', AW = '74px';
+    const itemRow = (name, qty, amt, scoops) => {
+      const qStr = Number.isInteger(qty) ? String(qty) : qty.toFixed(2);
+      let r = `<div style="display:flex;${ML};align-items:flex-start">`
+        + `<span style="flex:1;padding-right:4px;word-break:break-word">${escHtml(name)}</span>`
+        + `<span style="width:${QW};text-align:right;flex:none">${escHtml(qStr)}</span>`
+        + `<span style="width:${AW};text-align:right;flex:none">Rs ${amt.toFixed(2)}</span></div>`;
+      if (scoops) r += `<div style="${ML};font-size:9px;color:#444;padding-left:6px">${escHtml(scoops)}</div>`;
+      return r;
     };
-    const itemRows = sale.items.map((it, i) => {
+    const itemRows = sale.items.map((it) => {
       const flavorTxt = it.scoops?.length ? '• ' + it.scoops.map(s => s.flavorName).join(', ') : '';
-      return itemRow(i+1, it.name, parseFloat(it.quantity||0).toFixed(2), parseFloat(it.subtotal||0).toFixed(2), flavorTxt);
+      return itemRow(it.name, Number(it.quantity||0), Number(it.subtotal||0), flavorTxt);
     }).join('');
     const paymentLabel = sale.paymentMethod === 'cash' ? 'cash drawer' : (sale.paymentMethod === 'card' ? 'card payment' : 'other payment');
     const orderNumLong = `#ORD-${(sale.date||'').replace(/[-:T]/g,'').substring(0,8)}-${String(sale.orderNumber).padStart(5,'0')}`;
     const dateShort = new Date(sale.date).toLocaleString('en-US', {month:'short', day:'2-digit', year:'2-digit'}).replace(',', '') + ', ' + new Date(sale.date).toLocaleTimeString('en-US', {hour:'2-digit',minute:'2-digit'});
 
-    return `<div style="font-family:'Courier New',monospace;width:${w};background:#fff;padding:14px;font-size:11px;line-height:1.4">
-      ${ti.headerMessage?`<div style="text-align:center;font-size:10px;margin-bottom:4px">${escHtml(ti.headerMessage)}</div>`:''}
-      ${ti.showLogo!==false && (currentCfg.logo||store.logo) ? `<div style="text-align:center;margin-bottom:4px"><img src="${currentCfg.logo||store.logo}" style="max-width:${ti.logoSize||120}px;max-height:${ti.logoSize||120}px"></div>` : ''}
-      <div style="text-align:center;font-weight:900;font-size:14px;letter-spacing:1px">${escHtml((currentCfg.name||store.name||'').toUpperCase())}</div>
-      ${ti.showAddress!==false && (currentCfg.address||store.address) ? `<div style="text-align:center;font-size:10px;text-transform:uppercase">${escHtml(currentCfg.address||store.address)}</div>` : ''}
-      ${ti.showPhone!==false && (currentCfg.phone||store.phone) ? `<div style="text-align:center;font-size:10px">Tel: ${escHtml(currentCfg.phone||store.phone)}</div>` : ''}
-      ${ti.showEmail && (currentCfg.email||store.email) ? `<div style="text-align:center;font-size:10px">${escHtml(currentCfg.email||store.email)}</div>` : ''}
-      ${dashLine}
-      <div style="text-align:center;font-weight:700;font-size:13px;letter-spacing:1px">SALES RECEIPT</div>
-      ${dblLine}
-      <div style="text-align:center;font-weight:900;font-size:14px;letter-spacing:2px">*** PAID ***</div>
-      ${dblLine}
-      <div style="text-align:center;margin:10px 0">
-        <div style="display:inline-block;padding:5px 14px;border:2.5px solid #000;border-radius:8px;background:#fff">
-          <div style="font-family:'Arial Black',Impact,'Helvetica Neue',sans-serif;font-weight:900;font-size:22px;letter-spacing:1.5px;white-space:nowrap;color:#000;line-height:1.1">ORDER #${String(sale.orderNumber).padStart(3,'0')}</div>
+    return `<div style="font-family:'Courier New',monospace;width:${w};background:#fff;padding:5mm 3mm;font-size:10px;line-height:1.25">
+      ${ti.headerMessage?`<div style="text-align:center;font-size:9px;margin-bottom:1px">${escHtml(ti.headerMessage)}</div>`:''}
+      ${ti.showLogo!==false && (currentCfg.logo||store.logo) ? `<div style="text-align:center;margin-bottom:1px"><img src="${currentCfg.logo||store.logo}" style="max-width:${ti.logoSize||80}px;max-height:${ti.logoSize||80}px"></div>` : ''}
+      <div style="text-align:center;font-weight:900;font-size:13px;letter-spacing:1px">${escHtml((currentCfg.name||store.name||'').toUpperCase())}</div>
+      ${ti.showAddress!==false && (currentCfg.address||store.address) ? `<div style="text-align:center;font-size:9px;text-transform:uppercase">${escHtml(currentCfg.address||store.address)}</div>` : ''}
+      ${ti.showPhone!==false && (currentCfg.phone||store.phone) ? `<div style="text-align:center;font-size:9px">Tel: ${escHtml(currentCfg.phone||store.phone)}</div>` : ''}
+      ${ti.showEmail && (currentCfg.email||store.email) ? `<div style="text-align:center;font-size:9px">${escHtml(currentCfg.email||store.email)}</div>` : ''}
+      <div style="text-align:center;margin:5px 0 2px">
+        <div style="display:inline-block;padding:3px 12px;border:2px solid #000;border-radius:6px">
+          <div style="font-family:'Arial Black',Impact,sans-serif;font-weight:900;font-size:18px;letter-spacing:1px;white-space:nowrap;color:#000;line-height:1.1">ORDER #${String(sale.orderNumber).padStart(3,'0')}</div>
         </div>
       </div>
-      ${dblLine}
-      <div style="font-family:'Courier New',monospace;font-size:10px;white-space:pre">${escHtml(orderNumLong + '  ' + dateShort)}</div>
-      ${dblLine}
-      ${ti.showCashier!==false?`<div style="font-family:'Courier New',monospace;font-size:11px;white-space:pre">${escHtml(formatLabel('Created By', (sale.cashierName||state.currentUser?.name||'admin').toLowerCase()))}</div>`:''}
-      <div style="font-family:'Courier New',monospace;font-size:11px;white-space:pre">${escHtml(formatLabel('Customer', (state.cartCustomer?.name||'WALK-IN CUSTOMER').toUpperCase()))}</div>
-      <div style="font-family:'Courier New',monospace;font-size:11px;white-space:pre">${escHtml(formatLabel('Order Type', 'Takeaway'))}</div>
-      ${ti.showInvoice!==false?`<div style="font-family:'Courier New',monospace;font-size:11px;white-space:pre">${escHtml(formatLabel('Invoice', sale.invoiceNumber||''))}</div>`:''}
-      ${dblLine}
-      <div style="font-family:'Courier New',monospace;font-size:11px;white-space:pre;font-weight:700">${'ITEM'.padEnd(26) + '   QTY'.padStart(6) + ' AMT(Rs)'.padStart(11)}</div>
-      ${dashLine}
+      <div style="text-align:center;font-size:9px">${escHtml(dateShort)}</div>
+      ${sepThin}
+      ${ti.showCashier!==false?`<div style="display:flex;justify-content:space-between;${ML}"><span>Created By</span><span>${escHtml((sale.cashierName||state.currentUser?.name||'admin').toLowerCase())}</span></div>`:''}
+      ${ti.showInvoice!==false?`<div style="display:flex;justify-content:space-between;${ML}"><span>Invoice</span><span>${escHtml(sale.invoiceNumber||'')}</span></div>`:''}
+      ${sepThin}
+      <div style="display:flex;${ML};font-weight:700"><span style="flex:1">ITEM</span><span style="width:${QW};text-align:right">QTY</span><span style="width:${AW};text-align:right">AMT</span></div>
+      ${sepThin}
       ${itemRows}
-      ${dblLine}
-      <div style="display:flex;justify-content:space-between;font-family:'Courier New',monospace;font-size:11px;font-weight:700"><span>Subtotal</span><span>: Rs ${parseFloat(sale.subtotal||0).toFixed(2)}</span></div>
-      ${sale.discount?`<div style="display:flex;justify-content:space-between;font-family:'Courier New',monospace;font-size:11px;color:#c0392b;font-weight:700"><span>Discount${sale.discountCampaign?' ('+escHtml(sale.discountCampaign)+')':''}</span><span>: -Rs ${parseFloat(sale.discount||0).toFixed(2)}</span></div>`:''}
-      ${dblLine}
-      <div style="display:flex;justify-content:space-between;align-items:baseline;font-family:'Courier New',monospace;font-weight:900"><span style="font-size:13px">TOTAL</span><span style="font-size:13px">: Rs ${parseFloat(sale.total||0).toFixed(2)}</span></div>
-      ${dblLine}
+      ${sepThin}
+      <div style="display:flex;justify-content:space-between;${ML}"><span>Subtotal</span><span>Rs ${parseFloat(sale.subtotal||0).toFixed(2)}</span></div>
+      ${sale.discount?`<div style="display:flex;justify-content:space-between;${ML};color:#c0392b"><span>Discount</span><span>-Rs ${parseFloat(sale.discount||0).toFixed(2)}</span></div>`:''}
+      <div style="display:flex;justify-content:space-between;font-family:'Courier New',monospace;font-weight:900;font-size:12px;margin-top:1px"><span>TOTAL</span><span>Rs ${parseFloat(sale.total||0).toFixed(2)}</span></div>
       ${sale.paymentMethod==='cash' ? `
-        <div style="display:flex;justify-content:space-between;font-family:'Courier New',monospace;font-size:11px;font-weight:700"><span>Amt Paid</span><span>: Rs ${parseFloat(sale.cashGiven||0).toFixed(2)}</span></div>
-        <div style="display:flex;justify-content:space-between;font-family:'Courier New',monospace;font-size:11px;font-weight:700"><span>Change</span><span>: Rs ${parseFloat(sale.change||0).toFixed(2)}</span></div>
-        ${dblLine}` : ''}
-      <div style="font-family:'Courier New',monospace;font-weight:700;font-size:11px;letter-spacing:1px">PAYMENT DETAILS</div>
-      ${dashLine}
-      <div style="display:flex;justify-content:space-between;font-family:'Courier New',monospace;font-size:11px;font-weight:700"><span>${escHtml(paymentLabel)}</span><span>: Rs ${parseFloat(sale.total||0).toFixed(2)}</span></div>
-      ${dblLine}
-      <div style="text-align:center;font-size:10px;line-height:1.5;margin:4px 0">${escHtml(ti.footerMessage||currentCfg.footerMessage||store.footerMessage||'Thank you for visiting Dua Ice & Cafe!')}</div>
-      ${ti.qrUrl?`<div style="text-align:center;font-size:9px;word-break:break-all;margin-bottom:4px">${escHtml(ti.qrUrl)}</div>`:''}
-      ${ti.showQr!==false && qrSrc ? `<div style="text-align:center;margin-top:6px"><img src="${qrSrc}" style="width:${ti.qrSize||90}px;height:${ti.qrSize||90}px"></div>
-        <div style="text-align:center;font-size:10px;font-weight:700;margin-top:2px">${escHtml(ti.qrMessage||'Scan to leave us a review!')}</div>` : ''}
-      <div style="margin-top:10px"></div>
-      <div style="text-align:center;font-size:10px;color:#000">Powered by Dua Ice POS System</div>
-      <div style="text-align:center;font-size:10px;color:#000">Printed: ${new Date().toLocaleString('en-US',{month:'short',day:'2-digit',hour:'2-digit',minute:'2-digit'})}</div>
+        <div style="display:flex;justify-content:space-between;${ML}"><span>Amt Paid</span><span>Rs ${parseFloat(sale.cashGiven||0).toFixed(2)}</span></div>
+        <div style="display:flex;justify-content:space-between;${ML}"><span>Change</span><span>Rs ${parseFloat(sale.change||0).toFixed(2)}</span></div>` : ''}
+      ${sepThin}
+      <div style="${ML};font-weight:700;letter-spacing:1px">PAYMENT DETAILS</div>
+      <div style="display:flex;justify-content:space-between;${ML}"><span>${escHtml(paymentLabel)}</span><span>Rs ${parseFloat(sale.total||0).toFixed(2)}</span></div>
+      ${sepThin}
+      <div style="text-align:center;font-size:9px;line-height:1.3;margin:3px 0">${escHtml(ti.footerMessage||currentCfg.footerMessage||store.footerMessage||'Thank you for visiting Dua Ice & Cafe!')}</div>
+      ${ti.qrUrl?`<div style="text-align:center;font-size:8px;word-break:break-all">${escHtml(ti.qrUrl)}</div>`:''}
+      ${ti.showQr!==false && qrSrc ? `<div style="text-align:center;margin-top:4px"><img src="${qrSrc}" style="width:${ti.qrSize||80}px;height:${ti.qrSize||80}px"></div>
+        <div style="text-align:center;font-size:9px;font-weight:700;margin-top:1px">${escHtml(ti.qrMessage||'Scan to leave us a review!')}</div>` : ''}
+      <div style="text-align:center;font-size:8px;margin-top:4px">Powered by Dua Ice POS System</div>
     </div>`;
   }
 

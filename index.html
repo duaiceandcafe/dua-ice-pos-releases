@@ -1157,13 +1157,25 @@ const SYNC_KEY_BLACKLIST = new Set([
   'tpv_logo_version',
   'tpv_supplies_version',
   'tpv_golden_premium_version',
-  'tpv_initialized'
+  'tpv_initialized',
+  'tpv_pending_writes'        // offline write queue (local-only, never synced as data)
 ]);
 
 let supabaseClient = null;
 let syncStatus = 'offline';  // 'offline' | 'online' | 'syncing'
 let syncSubscription = null;
 let pendingWrites = [];
+let lastPullTime = null;       // newest updated_at we've applied (for incremental polling)
+let _syncWatchdog = null;      // periodic poll timer (safety net for flaky networks)
+let _resubscribeTimer = null;  // realtime auto-reconnect timer
+// Restore writes that were queued while offline in a previous session (survive reload)
+try { const _pw = JSON.parse(localStorage.getItem('tpv_pending_writes') || '[]'); if (Array.isArray(_pw)) pendingWrites = _pw; } catch(e) {}
+function persistPending() { try { localStorage.setItem('tpv_pending_writes', JSON.stringify(pendingWrites)); } catch(e) {} }
+function queuePending(key, value) {
+  pendingWrites = pendingWrites.filter(w => w.key !== key); // keep only the latest value per key
+  pendingWrites.push({ key, value });
+  persistPending();
+}
 
 function shouldSync(key) {
   return SYNC_ENABLED && key && key.startsWith(SYNC_KEY_PREFIX) && !SYNC_KEY_BLACKLIST.has(key);
@@ -1182,61 +1194,29 @@ async function initSupabaseSync() {
     supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       realtime: { params: { eventsPerSecond: 10 } }
     });
-    // 1) PULL: fetch all keys from cloud and merge into localStorage (cloud wins)
+    // 1) PULL everything once (cloud wins) — full initial sync
     const cloudKeys = new Set();
-    const { data: cloudRows, error } = await supabaseClient.from('pos_data').select('key,value,updated_at');
+    const { data: cloudRows, error } = await supabaseClient.from('pos_data').select('key,value,updated_at,device');
     if (error) throw error;
     if (cloudRows && cloudRows.length) {
-      cloudRows.forEach(row => {
-        try {
-          cloudKeys.add(row.key);
-          localStorage.setItem(row.key, JSON.stringify(row.value));
-        } catch(e) { console.error('[Sync] LS write failed:', e); }
-      });
+      cloudRows.forEach(row => { cloudKeys.add(row.key); applyCloudRow(row); });
       console.log(`[Sync] Pulled ${cloudRows.length} keys from cloud`);
-      // If we're on the login screen, re-render it so the user list reflects
-      // the freshly-pulled cloud config (new passwords, users, etc.)
+      // Re-render the login screen if visible so the user list reflects cloud config
       try {
         const ls = document.getElementById('login-screen');
         if (ls && ls.style.display !== 'none' && typeof showLogin === 'function') showLogin();
       } catch(e) {}
     }
-    // 2) PUSH pending writes — BUT skip keys the cloud already has.
-    //    Those queued writes are stale local defaults/migrations from this device's
-    //    boot-up seeding; pushing them would clobber authoritative cloud data
-    //    (e.g. a password changed on another device). Cloud always wins on conflict.
-    while (pendingWrites.length) {
-      const { key, value } = pendingWrites.shift();
-      if (cloudKeys.has(key)) continue; // cloud is authoritative for this key
-      await pushToCloud(key, value);
-    }
-    // 3) SUBSCRIBE to realtime changes
-    syncSubscription = supabaseClient
-      .channel('pos_data_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pos_data' }, payload => {
-        const row = payload.new || payload.old;
-        if (!row) return;
-        // Skip our own echoed updates
-        if (row.device === DEVICE_ID) return;
-        if (payload.eventType === 'DELETE') {
-          localStorage.removeItem(row.key);
-        } else {
-          try {
-            localStorage.setItem(row.key, JSON.stringify(row.value));
-            // Notify Admin of remote sale / shift events
-            try { NotifWatcher.onCloudKeyUpdate(row.key); } catch(e) { console.warn('[Notif] watcher failed', e); }
-            // Refresh affected UI elements (debounced)
-            scheduleUiRefresh();
-          } catch(e) { console.error('[Sync] LS write from cloud failed:', e); }
-        }
-      })
-      .subscribe(status => {
-        syncStatus = status === 'SUBSCRIBED' ? 'online' : 'offline';
-        updateSyncIndicator();
-      });
+    // 2) Flush writes queued offline — but on this FIRST sync skip keys the cloud
+    //    already owns (stale boot-up defaults; cloud stays authoritative).
+    await flushPending(cloudKeys);
+    // 3) Realtime updates + a 15s polling watchdog as a safety net for flaky
+    //    networks, so any missed event always gets caught up automatically.
+    subscribeRealtime();
+    startSyncWatchdog();
     syncStatus = 'online';
     updateSyncIndicator();
-    console.log('[Sync] Realtime sync active');
+    console.log('[Sync] Realtime + watchdog active');
   } catch(e) {
     console.error('[Sync] Init failed:', e);
     syncStatus = 'offline';
@@ -1245,7 +1225,7 @@ async function initSupabaseSync() {
 }
 
 async function pushToCloud(key, value) {
-  if (!supabaseClient) { pendingWrites.push({ key, value }); return; }
+  if (!supabaseClient) { queuePending(key, value); return; }
   try {
     const { error } = await supabaseClient.from('pos_data').upsert({
       key,
@@ -1255,12 +1235,105 @@ async function pushToCloud(key, value) {
       updated_by: (typeof state !== 'undefined' && state.currentUser?.name) || 'unknown'
     });
     if (error) throw error;
+    // success — drop any stale queued copy of this key
+    if (pendingWrites.some(w => w.key === key)) { pendingWrites = pendingWrites.filter(w => w.key !== key); persistPending(); }
   } catch(e) {
-    console.warn('[Sync] Push failed for', key, '— will retry later:', e.message);
-    pendingWrites.push({ key, value });
+    console.warn('[Sync] Push failed for', key, '— queued for retry:', e.message);
+    queuePending(key, value);
     syncStatus = 'offline';
     updateSyncIndicator();
   }
+}
+
+// ============================================================
+// RELIABILITY LAYER — incremental polling + realtime auto-reconnect
+// Keeps devices in sync even on unstable networks (missed WebSocket events).
+// ============================================================
+function applyCloudRow(row, deleted) {
+  if (!row || !row.key) return false;
+  if (pendingWrites.some(w => w.key === row.key)) return false; // never clobber an unsynced local change
+  try {
+    if (deleted) localStorage.removeItem(row.key);
+    else localStorage.setItem(row.key, JSON.stringify(row.value));
+    if (row.updated_at && (!lastPullTime || row.updated_at > lastPullTime)) lastPullTime = row.updated_at;
+    try { NotifWatcher.onCloudKeyUpdate(row.key); } catch(e) {}
+    return true;
+  } catch(e) { console.error('[Sync] apply failed', e); return false; }
+}
+
+async function pollSync() {
+  if (!supabaseClient) return;
+  try {
+    let q = supabaseClient.from('pos_data').select('key,value,updated_at,device');
+    if (lastPullTime) q = q.gt('updated_at', lastPullTime);
+    const { data, error } = await q;
+    if (error) throw error;
+    let changed = 0;
+    (data || []).forEach(row => {
+      if (row.device === DEVICE_ID) { // our own echo — just advance the clock
+        if (row.updated_at && (!lastPullTime || row.updated_at > lastPullTime)) lastPullTime = row.updated_at;
+        return;
+      }
+      if (applyCloudRow(row)) changed++;
+    });
+    if (syncStatus !== 'online') { syncStatus = 'online'; updateSyncIndicator(); }
+    if (changed) { scheduleUiRefresh(); softRefreshCurrentPage(); }
+  } catch(e) {
+    syncStatus = 'offline'; updateSyncIndicator();
+    console.warn('[Sync] poll failed:', e.message);
+  }
+}
+
+async function flushPending(skipKeys) {
+  if (!supabaseClient || !pendingWrites.length) return;
+  for (const w of pendingWrites.slice()) {
+    if (skipKeys && skipKeys.has(w.key)) { pendingWrites = pendingWrites.filter(x => x !== w); persistPending(); continue; }
+    try {
+      const { error } = await supabaseClient.from('pos_data').upsert({
+        key: w.key, value: w.value, updated_at: new Date().toISOString(),
+        device: DEVICE_ID, updated_by: (state.currentUser?.name) || 'unknown'
+      });
+      if (error) throw error;
+      pendingWrites = pendingWrites.filter(x => x !== w); persistPending();
+    } catch(e) { break; } // still offline — retry on the next tick
+  }
+}
+
+function subscribeRealtime() {
+  try { if (syncSubscription) supabaseClient.removeChannel(syncSubscription); } catch(e) {}
+  syncSubscription = supabaseClient
+    .channel('pos_data_rt_' + Date.now())
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'pos_data' }, payload => {
+      const row = payload.new || payload.old;
+      if (!row || row.device === DEVICE_ID) return;
+      if (applyCloudRow(row, payload.eventType === 'DELETE')) { scheduleUiRefresh(); softRefreshCurrentPage(); }
+    })
+    .subscribe(status => {
+      if (status === 'SUBSCRIBED') { syncStatus = 'online'; updateSyncIndicator(); pollSync(); }
+      else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+        syncStatus = 'offline'; updateSyncIndicator();
+        clearTimeout(_resubscribeTimer);
+        _resubscribeTimer = setTimeout(subscribeRealtime, 4000); // auto-reconnect
+      }
+    });
+}
+
+function startSyncWatchdog() {
+  if (_syncWatchdog) clearInterval(_syncWatchdog);
+  // Safety-net poll every 15s — catches any realtime events lost on a bad connection
+  _syncWatchdog = setInterval(() => { flushPending(); pollSync(); }, 15000);
+  window.addEventListener('online', () => { flushPending(); subscribeRealtime(); pollSync(); });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) { flushPending(); pollSync(); } });
+}
+
+function softRefreshCurrentPage() {
+  try {
+    if (document.querySelector('.modal-overlay')) return;  // don't disrupt an open dialog
+    const cp = state.currentPage;
+    if (!cp || cp === 'pos') return;                       // never re-render POS (would wipe an in-progress cart)
+    const content = document.getElementById('page-content');
+    if (content && content.style.display !== 'none' && typeof renderPage === 'function') renderPage(cp, content);
+  } catch(e) {}
 }
 
 let _uiRefreshTimer = null;

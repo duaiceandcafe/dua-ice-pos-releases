@@ -1253,8 +1253,29 @@ function applyCloudRow(row, deleted) {
   if (!row || !row.key) return false;
   if (pendingWrites.some(w => w.key === row.key)) return false; // never clobber an unsynced local change
   try {
-    if (deleted) localStorage.removeItem(row.key);
-    else localStorage.setItem(row.key, JSON.stringify(row.value));
+    if (deleted) {
+      localStorage.removeItem(row.key);
+    } else if (row.key === 'tpv_shifts' && Array.isArray(row.value)) {
+      // Smart merge: a shift that is locally "closed" must never be overwritten back to "open"
+      // by a stale push from another device (e.g. Dell that never closed its own copy).
+      const local = (() => { try { return JSON.parse(localStorage.getItem('tpv_shifts')) || []; } catch { return []; } })();
+      const localById = {};
+      local.forEach(s => { localById[s.id] = s; });
+      const merged = row.value.map(incoming => {
+        const existing = localById[incoming.id];
+        if (existing && existing.status === 'closed' && incoming.status === 'open') {
+          return existing; // keep local closed state — never re-open a closed shift
+        }
+        return incoming;
+      });
+      // Also keep any local shifts not present in the incoming cloud array
+      local.forEach(s => { if (!merged.some(m => m.id === s.id)) merged.push(s); });
+      localStorage.setItem('tpv_shifts', JSON.stringify(merged));
+      // Re-sync in-memory activeShift if we're logged in
+      if (state.currentUser) { try { loadActiveShift(); updateShiftBadge(); } catch(e) {} }
+    } else {
+      localStorage.setItem(row.key, JSON.stringify(row.value));
+    }
     if (row.updated_at && (!lastPullTime || row.updated_at > lastPullTime)) lastPullTime = row.updated_at;
     try { NotifWatcher.onCloudKeyUpdate(row.key); } catch(e) {}
     return true;
@@ -1921,6 +1942,7 @@ function doLogin() {
   updateTopbar();
   renderNav();
   loadActiveShift();
+  updateShiftBadge(); // re-paint after loadActiveShift resolved state.activeShift
   navigate('pos');
   // Initialize notification watcher + request permission (Admin only)
   try {
@@ -2284,7 +2306,51 @@ window.showStockAlerts = function() {
 
 function loadActiveShift() {
   const shifts = LS.get('tpv_shifts') || [];
-  state.activeShift = shifts.find(s => s.status === 'open' && s.cashierId === state.currentUser?.id) || null;
+  const userId = state.currentUser?.id;
+  if (!userId) { state.activeShift = null; return; }
+
+  // Find all "open" shifts for this user (should be 0 or 1; >1 means orphans)
+  const myOpenShifts = shifts.filter(s => s.status === 'open' && s.cashierId === userId);
+
+  // Defensive: if there are multiple open shifts, keep only the most recent and close the rest
+  if (myOpenShifts.length > 1) {
+    myOpenShifts.sort((a, b) => new Date(b.openedAt || 0) - new Date(a.openedAt || 0));
+    const keep = myOpenShifts[0];
+    const now = new Date().toISOString();
+    let cleaned = 0;
+    shifts.forEach(s => {
+      if (s.status === 'open' && s.cashierId === userId && s.id !== keep.id) {
+        s.status = 'closed';
+        s.closedAt = now;
+        s.forceClosedBecauseOrphan = true;
+        cleaned++;
+      }
+    });
+    LS.set('tpv_shifts', shifts);
+    console.warn(`loadActiveShift: cleaned ${cleaned} orphan open shifts`);
+    state.activeShift = keep;
+    return;
+  }
+
+  const candidate = myOpenShifts[0] || null;
+
+  // Defensive: if the shift is older than 24h, it was probably forgotten — auto-close it instead of restoring
+  if (candidate && candidate.openedAt) {
+    const ageHours = (Date.now() - new Date(candidate.openedAt).getTime()) / 3600000;
+    if (ageHours > 24) {
+      candidate.status = 'closed';
+      candidate.closedAt = new Date().toISOString();
+      candidate.forceClosedBecauseStale = true;
+      LS.set('tpv_shifts', shifts);
+      console.warn(`loadActiveShift: auto-closed stale shift (open for ${ageHours.toFixed(1)}h)`);
+      state.activeShift = null;
+      // Notify the user (best-effort, toast may not be ready at boot)
+      try { toast(`⚠️ A previous shift from ${ageHours.toFixed(0)}h ago was auto-closed`, 'warning', 4000); } catch (e) {}
+      return;
+    }
+  }
+
+  state.activeShift = candidate;
 }
 
 // ============================================================
@@ -3875,27 +3941,93 @@ window.calcDiscrepancy = function(expected) {
 };
 
 function confirmCloseShift() {
-  const shifts = LS.get('tpv_shifts') || [];
-  const sh = shifts.find(s => s.id === state.activeShift?.id);
-  if (sh) {
-    sh.status = 'closed';
-    sh.closedAt = new Date().toISOString();
-    sh.countedCash = parseFloat(document.getElementById('counted-cash')?.value) || null;
-    // Snapshot of breakdown for Cash Management report
-    const sales = (LS.get('tpv_sales') || []).filter(s => s.shiftId === sh.id && s.status === 'completed');
-    sh.cashSales = sales.filter(s => s.paymentMethod === 'cash').reduce((a,s)=>a+s.total, 0);
-    sh.cardSales = sales.filter(s => s.paymentMethod === 'card').reduce((a,s)=>a+s.total, 0);
-    sh.otherSales = sales.filter(s => s.paymentMethod === 'other').reduce((a,s)=>a+s.total, 0);
-    sh.cashIn = (sh.movements||[]).filter(m=>m.type==='in').reduce((a,m)=>a+m.amount,0);
-    sh.cashOut = (sh.movements||[]).filter(m=>m.type==='out').reduce((a,m)=>a+m.amount,0);
-    sh.expectedCash = (sh.openingFloat||0) + sh.cashSales + sh.cashIn - sh.cashOut;
-    sh.discrepancy = sh.countedCash !== null ? (sh.countedCash - sh.expectedCash) : null;
-  }
-  LS.set('tpv_shifts', shifts);
-  state.activeShift = null;
-  document.querySelector('.modal-overlay')?.remove();
-  updateShiftBadge();
-  toast('Shift closed successfully', 'success');
+  try {
+    const shifts = LS.get('tpv_shifts') || [];
+    const activeId = state.activeShift?.id;
+    const cashierId = state.activeShift?.cashierId || state.currentUser?.id;
+    const closedAt = new Date().toISOString();
+    const countedCash = parseFloat(document.getElementById('counted-cash')?.value);
+    const allSales = LS.get('tpv_sales') || [];
+
+    // Helper: apply close to a single shift object
+    const closeOne = (sh) => {
+      sh.status = 'closed';
+      sh.closedAt = closedAt;
+      sh.countedCash = isNaN(countedCash) ? null : countedCash;
+      const sales = allSales.filter(s => s.shiftId === sh.id && s.status === 'completed');
+      sh.cashSales = sales.filter(s => s.paymentMethod === 'cash').reduce((a,s)=>a+s.total, 0);
+      sh.cardSales = sales.filter(s => s.paymentMethod === 'card').reduce((a,s)=>a+s.total, 0);
+      sh.otherSales = sales.filter(s => s.paymentMethod === 'other').reduce((a,s)=>a+s.total, 0);
+      sh.cashIn = (sh.movements||[]).filter(m=>m.type==='in').reduce((a,m)=>a+m.amount,0);
+      sh.cashOut = (sh.movements||[]).filter(m=>m.type==='out').reduce((a,m)=>a+m.amount,0);
+      sh.expectedCash = (sh.openingFloat||0) + sh.cashSales + sh.cashIn - sh.cashOut;
+      sh.discrepancy = sh.countedCash !== null ? (sh.countedCash - sh.expectedCash) : null;
+    };
+
+    // Find the active shift
+    let sh = shifts.find(s => s.id === activeId);
+
+    // DEFENSIVE: also close any other open shifts owned by this cashier (orphans)
+    let orphansClosed = 0;
+    shifts.forEach(s => {
+      if (s.status === 'open' && s.cashierId === cashierId && s.id !== activeId) {
+        closeOne(s);
+        orphansClosed++;
+      }
+    });
+
+    // Close the active shift
+    if (sh) {
+      closeOne(sh);
+    } else if (activeId) {
+      // Active shift exists in memory but not in storage — recreate a minimal closed record
+      sh = {
+        id: activeId,
+        cashierId: cashierId,
+        cashierName: state.activeShift?.cashierName || state.currentUser?.name || 'Cashier',
+        openedAt: state.activeShift?.openedAt || closedAt,
+        openingFloat: state.activeShift?.openingFloat || 0,
+        movements: state.activeShift?.movements || [],
+        totalSales: state.activeShift?.totalSales || 0,
+        totalTickets: state.activeShift?.totalTickets || 0,
+        status: 'open'
+      };
+      closeOne(sh);
+      shifts.push(sh);
+    }
+
+    // Persist
+    LS.set('tpv_shifts', shifts);
+
+    // VERIFY: read back and confirm the shift is actually closed
+    const verify = (LS.get('tpv_shifts') || []).find(s => s.id === activeId);
+    if (verify && verify.status !== 'closed') {
+      throw new Error('Shift did not save as closed. Please try again.');
+    }
+    // Also verify no open shifts remain for this cashier
+    const stillOpen = (LS.get('tpv_shifts') || []).filter(s => s.status === 'open' && s.cashierId === cashierId);
+    if (stillOpen.length > 0) {
+      // Force-close any remaining ones
+      const allShifts = LS.get('tpv_shifts') || [];
+      allShifts.forEach(s => {
+        if (s.status === 'open' && s.cashierId === cashierId) {
+          s.status = 'closed';
+          s.closedAt = closedAt;
+          s.forceClosedBecauseOrphan = true;
+        }
+      });
+      LS.set('tpv_shifts', allShifts);
+    }
+
+    // Only NOW clean memory state — persistence is confirmed
+    state.activeShift = null;
+    document.querySelector('.modal-overlay')?.remove();
+    updateShiftBadge();
+    if (orphansClosed > 0) {
+      toast(`Shift closed (+ ${orphansClosed} orphan shift${orphansClosed>1?'s':''} cleaned)`, 'success');
+    } else {
+      toast('Shift closed successfully', 'success');
+    }
   try {
     if (sh) {
       const disc = sh.discrepancy;
@@ -3910,6 +4042,11 @@ function confirmCloseShift() {
   if (window._closeShiftForLogout) {
     window._closeShiftForLogout = false;
     setTimeout(() => doLogout(), 300);
+  }
+  } catch (err) {
+    console.error('confirmCloseShift error:', err);
+    toast('⚠️ Error closing shift: ' + (err.message || err) + ' — please try again', 'error', 5000);
+    // Do NOT clear state.activeShift on error, so the user can retry
   }
 }
 

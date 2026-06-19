@@ -3844,12 +3844,34 @@ window.printTicket = function(type, sale) {
 function openShift() { openShiftModal(); }
 
 function openShiftModal() {
-  if (state.activeShift) { toast('A shift is already open', 'warning'); return; }
-  const m = showModal(`<div class="modal modal-sm">
+  if (state.activeShift) {
+    const sh = state.activeShift;
+    const openedAt = sh.openedAt ? new Date(sh.openedAt).toLocaleString() : '—';
+    const hours = sh.openedAt ? ((Date.now() - new Date(sh.openedAt).getTime()) / 3600000).toFixed(1) : '?';
+    showModal(`<div class="modal modal-sm">
+      <div class="modal-header"><span class="modal-title">⚠️ Shift Already Open</span><button class="modal-close" onclick="this.closest('.modal-overlay').remove()">×</button></div>
+      <div class="modal-body">
+        <p style="margin-bottom:12px">There is already an open shift:</p>
+        <div style="background:var(--bg-sec);border-radius:8px;padding:12px;margin-bottom:16px;font-size:13px">
+          <div><strong>Cashier:</strong> ${escHtml(sh.cashierName||'—')}</div>
+          <div><strong>Opened:</strong> ${openedAt}</div>
+          <div><strong>Duration:</strong> ${hours}h</div>
+          <div><strong>Sales:</strong> ${fmt(sh.totalSales||0)} · ${sh.totalTickets||0} tickets</div>
+        </div>
+        <p style="color:var(--text-sec);font-size:13px">Close this shift first, then open a new one.</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="this.closest('.modal-overlay').remove()">Cancel</button>
+        <button class="btn btn-danger" onclick="this.closest('.modal-overlay').remove();closeShift()">Close Current Shift</button>
+      </div>
+    </div>`);
+    return;
+  }
+  showModal(`<div class="modal modal-sm">
     <div class="modal-header"><span class="modal-title">Open Shift</span><button class="modal-close" onclick="this.closest('.modal-overlay').remove()">×</button></div>
     <div class="modal-body">
       <p style="color:var(--text-sec);margin-bottom:16px">Enter the opening float for this shift.</p>
-      <div class="form-group"><label>Opening Float (€)</label><input type="number" id="opening-float" step="0.01" min="0" value="0" placeholder="0.00"></div>
+      <div class="form-group"><label>Opening Float (Rs)</label><input type="number" id="opening-float" step="1" min="0" value="0" placeholder="0"></div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="this.closest('.modal-overlay').remove()">Cancel</button>

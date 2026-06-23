@@ -88,6 +88,15 @@ nav::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.2);border-radius:2px}
 .product-badge{position:absolute;top:6px;right:6px;padding:2px 6px;border-radius:8px;font-size:10px;font-weight:700}
 .badge-ice{background:#e0f7ff;color:#0077aa}
 .badge-out{background:#ffe0e0;color:#cc0000}
+.badge-size{background:#fff3d6;color:#b8860b}
+.size-card{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:18px 12px}
+.size-icon{line-height:1;margin-bottom:2px}
+.flavor-card{display:flex;flex-direction:column;align-items:center;gap:8px;padding:14px 10px}
+.flavor-swatch{width:54px;height:54px;border-radius:50%;border:2px solid rgba(0,0,0,.08);box-shadow:inset 0 -6px 10px rgba(0,0,0,.12)}
+.scoop-chips{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:6px}
+.scoop-chip{display:inline-flex;align-items:center;gap:6px;border:1.5px solid;border-radius:20px;padding:4px 10px;font-size:12px;font-weight:600;color:var(--text)}
+.scoop-chip button{background:none;border:none;cursor:pointer;color:#c0392b;font-weight:700;font-size:13px;line-height:1;padding:0}
+.btn-sm{padding:6px 12px;font-size:12px}
 
 /* CART */
 .cart-header{padding:16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
@@ -1400,7 +1409,11 @@ let state = {
   cartCoupon: null,
   activeShift: null,
   activeCategoryFilter: 'all',
-  posView: 'categories', // 'categories' | 'products'
+  posView: 'categories', // 'categories' | 'products' | 'sizes' | 'flavors'
+  sizeGroup: null,      // { base, products:[...] } for the size-picker screen
+  flavorProduct: null,  // product currently choosing flavors for
+  flavorScoops: [],     // scoops picked so far on the flavor screen
+  flavorReturnTo: 'products', // where Back goes from the flavor screen
   callWindow: null,
   sidebarCollapsed: false
 };
@@ -1428,9 +1441,9 @@ function initData() {
     ticket: { showVATBreakdown: true, showAddress: true, showPhone: true, showEmail: false, resetDailyNumbering: false },
     printer: { method: 'browser', ip: '', port: 9100 },
     users: [
-      { id: uid(), name: 'Admin', role: 'admin', password: 'admin123', active: true },
-      { id: uid(), name: 'Sarah', role: 'cashier', password: 'sarah123', active: true },
-      { id: uid(), name: 'James', role: 'cashier', password: 'james123', active: true }
+      { id: '58d037d0-f673-40e1-8836-40133e390496', name: 'DUA', role: 'admin', password: 'Dua20', active: true },
+      { id: '87310e63-0aff-4e71-bb78-f0ff54cb880d', name: 'ADNAN MANAGER', role: 'cashier', password: 'ADNAN123', active: true },
+      { id: '8798c275-54ec-4594-b558-44dac3b19eb9', name: 'NUMAN MANAGER', role: 'cashier', password: 'NUMAN123', active: true }
     ]
   });
 
@@ -1465,261 +1478,261 @@ function initData() {
 
   const defaultFlavor = (extras) => ({ scoopsPerTub: 50, scoopsRemaining: 0, totalScoopsSold: 0, ...extras });
   LS.set('tpv_flavors', [
-    defaultFlavor({ id: uid(), name: 'Chocolate', color: '#6B3A2A', available: true, costPrice: 40, order: 1 }),
-    defaultFlavor({ id: uid(), name: 'Vanilla', color: '#F7DC6F', available: true, costPrice: 35, order: 2 }),
-    defaultFlavor({ id: uid(), name: 'Strawberry', color: '#FF6B9D', available: true, costPrice: 40, order: 3 }),
-    defaultFlavor({ id: uid(), name: 'Pistachio', color: '#93C572', available: true, costPrice: 50, order: 4 }),
-    defaultFlavor({ id: uid(), name: 'Mango', color: '#FF9F43', available: true, costPrice: 40, order: 5 }),
-    defaultFlavor({ id: uid(), name: 'Coconut', color: '#E8F5E9', available: true, costPrice: 40, order: 6 }),
-    defaultFlavor({ id: uid(), name: 'Tutti Frutti', color: '#FF80AB', available: true, costPrice: 40, order: 7 }),
-    defaultFlavor({ id: uid(), name: 'Pineapple', color: '#FFE57F', available: true, costPrice: 40, order: 8 }),
-    defaultFlavor({ id: uid(), name: 'Blueberry', color: '#5C6BC0', available: true, costPrice: 40, order: 9 }),
-    defaultFlavor({ id: uid(), name: 'Caramel', color: '#E67E22', available: true, costPrice: 40, order: 10 }),
-    defaultFlavor({ id: uid(), name: 'Kulfa', color: '#F48FB1', available: true, costPrice: 45, order: 11 }),
-    defaultFlavor({ id: uid(), name: 'Lotus', color: '#D4A76A', available: true, costPrice: 55, order: 12 }),
-    defaultFlavor({ id: uid(), name: 'Nutella', color: '#795548', available: true, costPrice: 50, order: 13 }),
-    defaultFlavor({ id: uid(), name: 'Oreo', color: '#424242', available: true, costPrice: 45, order: 14 }),
-    defaultFlavor({ id: uid(), name: 'Mint', color: '#1ABC9C', available: true, costPrice: 40, order: 15 }),
-    defaultFlavor({ id: uid(), name: 'Choco Peanut Butter', color: '#8D6E63', available: true, costPrice: 50, order: 16 })
+    defaultFlavor({ id: uid(), name: 'Chocolate', color: '#6B3A2A', available: true, costPrice: 0, order: 1 }),
+    defaultFlavor({ id: uid(), name: 'Vanilla', color: '#F7DC6F', available: true, costPrice: 0, order: 2 }),
+    defaultFlavor({ id: uid(), name: 'Strawberry', color: '#FF6B9D', available: true, costPrice: 0, order: 3 }),
+    defaultFlavor({ id: uid(), name: 'Pistachio', color: '#93C572', available: true, costPrice: 0, order: 4 }),
+    defaultFlavor({ id: uid(), name: 'Mango', color: '#FF9F43', available: true, costPrice: 0, order: 5 }),
+    defaultFlavor({ id: uid(), name: 'Coconut', color: '#E8F5E9', available: true, costPrice: 0, order: 6 }),
+    defaultFlavor({ id: uid(), name: 'Tutti Frutti', color: '#FF80AB', available: true, costPrice: 0, order: 7 }),
+    defaultFlavor({ id: uid(), name: 'Pineapple', color: '#FFE57F', available: true, costPrice: 0, order: 8 }),
+    defaultFlavor({ id: uid(), name: 'Blueberry', color: '#5C6BC0', available: true, costPrice: 0, order: 9 }),
+    defaultFlavor({ id: uid(), name: 'Caramel', color: '#E67E22', available: true, costPrice: 0, order: 10 }),
+    defaultFlavor({ id: uid(), name: 'Kulfa', color: '#F48FB1', available: true, costPrice: 0, order: 11 }),
+    defaultFlavor({ id: uid(), name: 'Lotus', color: '#D4A76A', available: true, costPrice: 0, order: 12 }),
+    defaultFlavor({ id: uid(), name: 'Nutella', color: '#795548', available: true, costPrice: 0, order: 13 }),
+    defaultFlavor({ id: uid(), name: 'Oreo', color: '#424242', available: true, costPrice: 0, order: 14 }),
+    defaultFlavor({ id: uid(), name: 'Mint', color: '#1ABC9C', available: true, costPrice: 0, order: 15 }),
+    defaultFlavor({ id: uid(), name: 'Choco Peanut Butter', color: '#8D6E63', available: true, costPrice: 0, order: 16 })
   ]);
 
   const now = new Date().toISOString();
   LS.set('tpv_products', [
     // SHAKES,
-    { id: uid(), name: 'Pistachio Shake', description: '', categoryId: catIds.Shakes, supplierId: '', image: '', salePrice: 650, costPrice: 195, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Kulfa Shake', description: '', categoryId: catIds.Shakes, supplierId: '', image: '', salePrice: 550, costPrice: 165, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Mango Shake', description: '', categoryId: catIds.Shakes, supplierId: '', image: '', salePrice: 520, costPrice: 156, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Mango Cheese Cake Shake', description: '', categoryId: catIds.Shakes, supplierId: '', image: '', salePrice: 650, costPrice: 195, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Strawberry Shake', description: '', categoryId: catIds.Shakes, supplierId: '', image: '', salePrice: 520, costPrice: 156, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Strawberry Cheese Cake Shake', description: '', categoryId: catIds.Shakes, supplierId: '', image: '', salePrice: 650, costPrice: 195, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Vanilla Shake', description: '', categoryId: catIds.Shakes, supplierId: '', image: '', salePrice: 520, costPrice: 156, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Coconut Shake', description: '', categoryId: catIds.Shakes, supplierId: '', image: '', salePrice: 520, costPrice: 156, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Tutti Frutti Shake', description: '', categoryId: catIds.Shakes, supplierId: '', image: '', salePrice: 520, costPrice: 156, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Pineapple Shake', description: '', categoryId: catIds.Shakes, supplierId: '', image: '', salePrice: 520, costPrice: 156, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Blueberry Shake', description: '', categoryId: catIds.Shakes, supplierId: '', image: '', salePrice: 520, costPrice: 156, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Blueberry Cheese Cake Shake', description: '', categoryId: catIds.Shakes, supplierId: '', image: '', salePrice: 650, costPrice: 195, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Chocolate Shake', description: '', categoryId: catIds.Shakes, supplierId: '', image: '', salePrice: 520, costPrice: 156, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Caramel Shake', description: '', categoryId: catIds.Shakes, supplierId: '', image: '', salePrice: 520, costPrice: 156, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Nuttella Shake', description: '', categoryId: catIds.Shakes, supplierId: '', image: '', salePrice: 580, costPrice: 174, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Oreo Shake', description: '', categoryId: catIds.Shakes, supplierId: '', image: '', salePrice: 530, costPrice: 159, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Oreo Mint Shake', description: '', categoryId: catIds.Shakes, supplierId: '', image: '', salePrice: 580, costPrice: 174, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Mint Shake', description: '', categoryId: catIds.Shakes, supplierId: '', image: '', salePrice: 530, costPrice: 159, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Hazelnut Shake', description: '', categoryId: catIds.Shakes, supplierId: '', image: '', salePrice: 650, costPrice: 195, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Lotus Shake', description: '', categoryId: catIds.Shakes, supplierId: '', image: '', salePrice: 650, costPrice: 195, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Lotus Cheese Cake Shake', description: '', categoryId: catIds.Shakes, supplierId: '', image: '', salePrice: 750, costPrice: 225, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Choco Peanut Butter Shake', description: '', categoryId: catIds.Shakes, supplierId: '', image: '', salePrice: 580, costPrice: 174, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Choco Lava Shake', description: '', categoryId: catIds.Shakes, supplierId: '', image: '', salePrice: 650, costPrice: 195, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Kitkat Shake', description: '', categoryId: catIds.Shakes, supplierId: '', image: '', salePrice: 650, costPrice: 195, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Xtreme Shake', description: '', categoryId: catIds.Shakes, supplierId: '', image: '', salePrice: 650, costPrice: 195, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Chocolate Xtreme Shake', description: '', categoryId: catIds.Shakes, supplierId: '', image: '', salePrice: 650, costPrice: 195, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Chocolate Oreo Shake', description: '', categoryId: catIds.Shakes, supplierId: '', image: '', salePrice: 600, costPrice: 180, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Pistachio Shake', description: '', categoryId: catIds.Shakes, supplierId: '', image: '', salePrice: 650, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Kulfa Shake', description: '', categoryId: catIds.Shakes, supplierId: '', image: '', salePrice: 550, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Mango Shake', description: '', categoryId: catIds.Shakes, supplierId: '', image: '', salePrice: 520, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Mango Cheese Cake Shake', description: '', categoryId: catIds.Shakes, supplierId: '', image: '', salePrice: 650, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Strawberry Shake', description: '', categoryId: catIds.Shakes, supplierId: '', image: '', salePrice: 520, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Strawberry Cheese Cake Shake', description: '', categoryId: catIds.Shakes, supplierId: '', image: '', salePrice: 650, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Vanilla Shake', description: '', categoryId: catIds.Shakes, supplierId: '', image: '', salePrice: 520, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Coconut Shake', description: '', categoryId: catIds.Shakes, supplierId: '', image: '', salePrice: 520, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Tutti Frutti Shake', description: '', categoryId: catIds.Shakes, supplierId: '', image: '', salePrice: 520, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Pineapple Shake', description: '', categoryId: catIds.Shakes, supplierId: '', image: '', salePrice: 520, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Blueberry Shake', description: '', categoryId: catIds.Shakes, supplierId: '', image: '', salePrice: 520, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Blueberry Cheese Cake Shake', description: '', categoryId: catIds.Shakes, supplierId: '', image: '', salePrice: 650, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Chocolate Shake', description: '', categoryId: catIds.Shakes, supplierId: '', image: '', salePrice: 520, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Caramel Shake', description: '', categoryId: catIds.Shakes, supplierId: '', image: '', salePrice: 520, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Nuttella Shake', description: '', categoryId: catIds.Shakes, supplierId: '', image: '', salePrice: 580, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Oreo Shake', description: '', categoryId: catIds.Shakes, supplierId: '', image: '', salePrice: 530, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Oreo Mint Shake', description: '', categoryId: catIds.Shakes, supplierId: '', image: '', salePrice: 580, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Mint Shake', description: '', categoryId: catIds.Shakes, supplierId: '', image: '', salePrice: 530, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Hazelnut Shake', description: '', categoryId: catIds.Shakes, supplierId: '', image: '', salePrice: 650, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Lotus Shake', description: '', categoryId: catIds.Shakes, supplierId: '', image: '', salePrice: 650, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Lotus Cheese Cake Shake', description: '', categoryId: catIds.Shakes, supplierId: '', image: '', salePrice: 750, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Choco Peanut Butter Shake', description: '', categoryId: catIds.Shakes, supplierId: '', image: '', salePrice: 580, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Choco Lava Shake', description: '', categoryId: catIds.Shakes, supplierId: '', image: '', salePrice: 650, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Kitkat Shake', description: '', categoryId: catIds.Shakes, supplierId: '', image: '', salePrice: 650, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Xtreme Shake', description: '', categoryId: catIds.Shakes, supplierId: '', image: '', salePrice: 650, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Chocolate Xtreme Shake', description: '', categoryId: catIds.Shakes, supplierId: '', image: '', salePrice: 650, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Chocolate Oreo Shake', description: '', categoryId: catIds.Shakes, supplierId: '', image: '', salePrice: 600, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
     // BLENDIES,
-    { id: uid(), name: 'Oreo Blendie', description: '', categoryId: catIds.Blendies, supplierId: '', image: '', salePrice: 520, costPrice: 156, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Oreo Mint Blendie', description: '', categoryId: catIds.Blendies, supplierId: '', image: '', salePrice: 550, costPrice: 165, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Kit Kat Blendie', description: '', categoryId: catIds.Blendies, supplierId: '', image: '', salePrice: 580, costPrice: 174, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Dairy Milk Blendie', description: '', categoryId: catIds.Blendies, supplierId: '', image: '', salePrice: 580, costPrice: 174, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Mars Blendie', description: '', categoryId: catIds.Blendies, supplierId: '', image: '', salePrice: 580, costPrice: 174, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Pistachio Blendie', description: '', categoryId: catIds.Blendies, supplierId: '', image: '', salePrice: 580, costPrice: 174, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Lotus Biscoff Blendie', description: '', categoryId: catIds.Blendies, supplierId: '', image: '', salePrice: 580, costPrice: 174, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Bounty Blendie', description: '', categoryId: catIds.Blendies, supplierId: '', image: '', salePrice: 580, costPrice: 174, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Nutty Peanut Butter Blendie', description: '', categoryId: catIds.Blendies, supplierId: '', image: '', salePrice: 580, costPrice: 174, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Caramel Biscotti Blendie', description: '', categoryId: catIds.Blendies, supplierId: '', image: '', salePrice: 580, costPrice: 174, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Snickers Blendie', description: '', categoryId: catIds.Blendies, supplierId: '', image: '', salePrice: 580, costPrice: 174, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Lotus Cheese Cake Blendie', description: '', categoryId: catIds.Blendies, supplierId: '', image: '', salePrice: 680, costPrice: 204, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Toblerone Blendie', description: '', categoryId: catIds.Blendies, supplierId: '', image: '', salePrice: 580, costPrice: 174, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Chocolate Xtreme Blendie', description: '', categoryId: catIds.Blendies, supplierId: '', image: '', salePrice: 580, costPrice: 174, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Kit Kat Xtreme Blendie', description: '', categoryId: catIds.Blendies, supplierId: '', image: '', salePrice: 640, costPrice: 192, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Oreo Blendie', description: '', categoryId: catIds.Blendies, supplierId: '', image: '', salePrice: 520, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Oreo Mint Blendie', description: '', categoryId: catIds.Blendies, supplierId: '', image: '', salePrice: 550, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Kit Kat Blendie', description: '', categoryId: catIds.Blendies, supplierId: '', image: '', salePrice: 580, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Dairy Milk Blendie', description: '', categoryId: catIds.Blendies, supplierId: '', image: '', salePrice: 580, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Mars Blendie', description: '', categoryId: catIds.Blendies, supplierId: '', image: '', salePrice: 580, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Pistachio Blendie', description: '', categoryId: catIds.Blendies, supplierId: '', image: '', salePrice: 580, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Lotus Biscoff Blendie', description: '', categoryId: catIds.Blendies, supplierId: '', image: '', salePrice: 580, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Bounty Blendie', description: '', categoryId: catIds.Blendies, supplierId: '', image: '', salePrice: 580, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Nutty Peanut Butter Blendie', description: '', categoryId: catIds.Blendies, supplierId: '', image: '', salePrice: 580, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Caramel Biscotti Blendie', description: '', categoryId: catIds.Blendies, supplierId: '', image: '', salePrice: 580, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Snickers Blendie', description: '', categoryId: catIds.Blendies, supplierId: '', image: '', salePrice: 580, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Lotus Cheese Cake Blendie', description: '', categoryId: catIds.Blendies, supplierId: '', image: '', salePrice: 680, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Toblerone Blendie', description: '', categoryId: catIds.Blendies, supplierId: '', image: '', salePrice: 580, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Chocolate Xtreme Blendie', description: '', categoryId: catIds.Blendies, supplierId: '', image: '', salePrice: 580, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Kit Kat Xtreme Blendie', description: '', categoryId: catIds.Blendies, supplierId: '', image: '', salePrice: 640, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
     // SCOOPS,
-    { id: uid(), name: 'One Scoop', description: '', categoryId: catIds.Scoops, supplierId: '', image: '', salePrice: 100, costPrice: 30, vat: 0, isIceCream: true, maxScoops: 1, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Scoops Small', description: '', categoryId: catIds.Scoops, supplierId: '', image: '', salePrice: 170, costPrice: 51, vat: 0, isIceCream: true, maxScoops: 2, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Scoops Medium', description: '', categoryId: catIds.Scoops, supplierId: '', image: '', salePrice: 250, costPrice: 75, vat: 0, isIceCream: true, maxScoops: 3, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Scoops Large', description: '', categoryId: catIds.Scoops, supplierId: '', image: '', salePrice: 300, costPrice: 90, vat: 0, isIceCream: true, maxScoops: 4, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Kulfa Badam Scoop', description: '', categoryId: catIds.Scoops, supplierId: '', image: '', salePrice: 170, costPrice: 51, vat: 0, isIceCream: true, maxScoops: 2, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'One Scoop', description: '', categoryId: catIds.Scoops, supplierId: '', image: '', salePrice: 100, costPrice: 0, vat: 0, isIceCream: true, maxScoops: 1, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Scoops Small', description: '', categoryId: catIds.Scoops, supplierId: '', image: '', salePrice: 170, costPrice: 0, vat: 0, isIceCream: true, maxScoops: 2, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Scoops Medium', description: '', categoryId: catIds.Scoops, supplierId: '', image: '', salePrice: 250, costPrice: 0, vat: 0, isIceCream: true, maxScoops: 3, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Scoops Large', description: '', categoryId: catIds.Scoops, supplierId: '', image: '', salePrice: 300, costPrice: 0, vat: 0, isIceCream: true, maxScoops: 4, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Kulfa Badam Scoop', description: '', categoryId: catIds.Scoops, supplierId: '', image: '', salePrice: 170, costPrice: 0, vat: 0, isIceCream: true, maxScoops: 2, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
     // SPECIAL OFFER,
-    { id: uid(), name: 'Half Liter', description: '', categoryId: catIds.SpecialOffer, supplierId: '', image: '', salePrice: 500, costPrice: 150, vat: 0, isIceCream: true, maxScoops: 6, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Full Liter', description: '', categoryId: catIds.SpecialOffer, supplierId: '', image: '', salePrice: 1000, costPrice: 300, vat: 0, isIceCream: true, maxScoops: 10, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Half Liter', description: '', categoryId: catIds.SpecialOffer, supplierId: '', image: '', salePrice: 500, costPrice: 0, vat: 0, isIceCream: true, maxScoops: 6, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Full Liter', description: '', categoryId: catIds.SpecialOffer, supplierId: '', image: '', salePrice: 1000, costPrice: 0, vat: 0, isIceCream: true, maxScoops: 10, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
     // CONES,
-    { id: uid(), name: 'Waffle Cone', description: '', categoryId: catIds.Cones, supplierId: '', image: '', salePrice: 140, costPrice: 42, vat: 0, isIceCream: true, maxScoops: 1, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Oren Waffle Cone', description: '', categoryId: catIds.Cones, supplierId: '', image: '', salePrice: 220, costPrice: 66, vat: 0, isIceCream: true, maxScoops: 2, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Sprinkle Waffle Cone', description: '', categoryId: catIds.Cones, supplierId: '', image: '', salePrice: 220, costPrice: 66, vat: 0, isIceCream: true, maxScoops: 2, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Nutty Waffle Cone', description: '', categoryId: catIds.Cones, supplierId: '', image: '', salePrice: 220, costPrice: 66, vat: 0, isIceCream: true, maxScoops: 2, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Crunch Cone', description: '', categoryId: catIds.Cones, supplierId: '', image: '', salePrice: 220, costPrice: 66, vat: 0, isIceCream: true, maxScoops: 2, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Dip Cone', description: '', categoryId: catIds.Cones, supplierId: '', image: '', salePrice: 220, costPrice: 66, vat: 0, isIceCream: true, maxScoops: 2, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Dua Special Cone', description: '', categoryId: catIds.Cones, supplierId: '', image: '', salePrice: 300, costPrice: 90, vat: 0, isIceCream: true, maxScoops: 3, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Choco Nutty Cone', description: '', categoryId: catIds.Cones, supplierId: '', image: '', salePrice: 250, costPrice: 75, vat: 0, isIceCream: true, maxScoops: 2, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Waffle Cone', description: '', categoryId: catIds.Cones, supplierId: '', image: '', salePrice: 140, costPrice: 0, vat: 0, isIceCream: true, maxScoops: 1, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Oren Waffle Cone', description: '', categoryId: catIds.Cones, supplierId: '', image: '', salePrice: 220, costPrice: 0, vat: 0, isIceCream: true, maxScoops: 2, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Sprinkle Waffle Cone', description: '', categoryId: catIds.Cones, supplierId: '', image: '', salePrice: 220, costPrice: 0, vat: 0, isIceCream: true, maxScoops: 2, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Nutty Waffle Cone', description: '', categoryId: catIds.Cones, supplierId: '', image: '', salePrice: 220, costPrice: 0, vat: 0, isIceCream: true, maxScoops: 2, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Crunch Cone', description: '', categoryId: catIds.Cones, supplierId: '', image: '', salePrice: 220, costPrice: 0, vat: 0, isIceCream: true, maxScoops: 2, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Dip Cone', description: '', categoryId: catIds.Cones, supplierId: '', image: '', salePrice: 220, costPrice: 0, vat: 0, isIceCream: true, maxScoops: 2, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Dua Special Cone', description: '', categoryId: catIds.Cones, supplierId: '', image: '', salePrice: 300, costPrice: 0, vat: 0, isIceCream: true, maxScoops: 3, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Choco Nutty Cone', description: '', categoryId: catIds.Cones, supplierId: '', image: '', salePrice: 250, costPrice: 0, vat: 0, isIceCream: true, maxScoops: 2, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
     // SUNDAES,
-    { id: uid(), name: 'Strawberry Sundae', description: '', categoryId: catIds.Sundaes, supplierId: '', image: '', salePrice: 450, costPrice: 135, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Mango Sundae', description: '', categoryId: catIds.Sundaes, supplierId: '', image: '', salePrice: 450, costPrice: 135, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Chocolate Fudge Sundae', description: '', categoryId: catIds.Sundaes, supplierId: '', image: '', salePrice: 450, costPrice: 135, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Special Nutty Sundae', description: '', categoryId: catIds.Sundaes, supplierId: '', image: '', salePrice: 450, costPrice: 135, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Caramel Sundae', description: '', categoryId: catIds.Sundaes, supplierId: '', image: '', salePrice: 450, costPrice: 135, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Blueberry Sundae', description: '', categoryId: catIds.Sundaes, supplierId: '', image: '', salePrice: 450, costPrice: 135, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Peanut Butter Sundae', description: '', categoryId: catIds.Sundaes, supplierId: '', image: '', salePrice: 450, costPrice: 135, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Oreo Sundae', description: '', categoryId: catIds.Sundaes, supplierId: '', image: '', salePrice: 450, costPrice: 135, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Pistachio Sundae', description: '', categoryId: catIds.Sundaes, supplierId: '', image: '', salePrice: 500, costPrice: 150, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Lotus Sundae', description: '', categoryId: catIds.Sundaes, supplierId: '', image: '', salePrice: 500, costPrice: 150, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Nutella Sundae', description: '', categoryId: catIds.Sundaes, supplierId: '', image: '', salePrice: 500, costPrice: 150, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Chocolate Oreo Sundae', description: '', categoryId: catIds.Sundaes, supplierId: '', image: '', salePrice: 500, costPrice: 150, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Choco Peanut Butter Sundae', description: '', categoryId: catIds.Sundaes, supplierId: '', image: '', salePrice: 500, costPrice: 150, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Super Fudge Sundae', description: '', categoryId: catIds.Sundaes, supplierId: '', image: '', salePrice: 550, costPrice: 165, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Strawberry Sundae', description: '', categoryId: catIds.Sundaes, supplierId: '', image: '', salePrice: 450, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Mango Sundae', description: '', categoryId: catIds.Sundaes, supplierId: '', image: '', salePrice: 450, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Chocolate Fudge Sundae', description: '', categoryId: catIds.Sundaes, supplierId: '', image: '', salePrice: 450, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Special Nutty Sundae', description: '', categoryId: catIds.Sundaes, supplierId: '', image: '', salePrice: 450, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Caramel Sundae', description: '', categoryId: catIds.Sundaes, supplierId: '', image: '', salePrice: 450, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Blueberry Sundae', description: '', categoryId: catIds.Sundaes, supplierId: '', image: '', salePrice: 450, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Peanut Butter Sundae', description: '', categoryId: catIds.Sundaes, supplierId: '', image: '', salePrice: 450, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Oreo Sundae', description: '', categoryId: catIds.Sundaes, supplierId: '', image: '', salePrice: 450, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Pistachio Sundae', description: '', categoryId: catIds.Sundaes, supplierId: '', image: '', salePrice: 500, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Lotus Sundae', description: '', categoryId: catIds.Sundaes, supplierId: '', image: '', salePrice: 500, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Nutella Sundae', description: '', categoryId: catIds.Sundaes, supplierId: '', image: '', salePrice: 500, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Chocolate Oreo Sundae', description: '', categoryId: catIds.Sundaes, supplierId: '', image: '', salePrice: 500, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Choco Peanut Butter Sundae', description: '', categoryId: catIds.Sundaes, supplierId: '', image: '', salePrice: 500, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Super Fudge Sundae', description: '', categoryId: catIds.Sundaes, supplierId: '', image: '', salePrice: 550, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
     // DELIGHTS,
-    { id: uid(), name: 'Brownie', description: '', categoryId: catIds.Delights, supplierId: '', image: '', salePrice: 300, costPrice: 90, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Brownie & Ice Cream', description: '', categoryId: catIds.Delights, supplierId: '', image: '', salePrice: 400, costPrice: 120, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Molten Lava', description: '', categoryId: catIds.Delights, supplierId: '', image: '', salePrice: 380, costPrice: 114, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Molten Lava with Ice Cream', description: '', categoryId: catIds.Delights, supplierId: '', image: '', salePrice: 480, costPrice: 144, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Lotus Kunafa', description: '', categoryId: catIds.Delights, supplierId: '', image: '', salePrice: 600, costPrice: 180, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Kunafa Pistachio', description: '', categoryId: catIds.Delights, supplierId: '', image: '', salePrice: 600, costPrice: 180, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Kunafa Coconut', description: '', categoryId: catIds.Delights, supplierId: '', image: '', salePrice: 600, costPrice: 180, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Double Sauce Brownie', description: '', categoryId: catIds.Delights, supplierId: '', image: '', salePrice: 500, costPrice: 150, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Brownie', description: '', categoryId: catIds.Delights, supplierId: '', image: '', salePrice: 300, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Brownie & Ice Cream', description: '', categoryId: catIds.Delights, supplierId: '', image: '', salePrice: 400, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Molten Lava', description: '', categoryId: catIds.Delights, supplierId: '', image: '', salePrice: 380, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Molten Lava with Ice Cream', description: '', categoryId: catIds.Delights, supplierId: '', image: '', salePrice: 480, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Lotus Kunafa', description: '', categoryId: catIds.Delights, supplierId: '', image: '', salePrice: 600, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Kunafa Pistachio', description: '', categoryId: catIds.Delights, supplierId: '', image: '', salePrice: 600, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Kunafa Coconut', description: '', categoryId: catIds.Delights, supplierId: '', image: '', salePrice: 600, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Double Sauce Brownie', description: '', categoryId: catIds.Delights, supplierId: '', image: '', salePrice: 500, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
     // CAKE,
-    { id: uid(), name: 'Cheese Cake', description: '', categoryId: catIds.Cake, supplierId: '', image: '', salePrice: 520, costPrice: 156, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Lotus Cheese Cake', description: '', categoryId: catIds.Cake, supplierId: '', image: '', salePrice: 620, costPrice: 186, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Nuttella Cheese Cake', description: '', categoryId: catIds.Cake, supplierId: '', image: '', salePrice: 620, costPrice: 186, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Pistachio Cheese Cake', description: '', categoryId: catIds.Cake, supplierId: '', image: '', salePrice: 620, costPrice: 186, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Cheese Cake', description: '', categoryId: catIds.Cake, supplierId: '', image: '', salePrice: 520, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Lotus Cheese Cake', description: '', categoryId: catIds.Cake, supplierId: '', image: '', salePrice: 620, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Nuttella Cheese Cake', description: '', categoryId: catIds.Cake, supplierId: '', image: '', salePrice: 620, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Pistachio Cheese Cake', description: '', categoryId: catIds.Cake, supplierId: '', image: '', salePrice: 620, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
     // SUPER CUP,
-    { id: uid(), name: 'Vanilla Super Cup', description: '', categoryId: catIds.SuperCup, supplierId: '', image: '', salePrice: 150, costPrice: 45, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Waffle Dip Cone in Cup', description: '', categoryId: catIds.SuperCup, supplierId: '', image: '', salePrice: 220, costPrice: 66, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Standard Super Cup', description: '', categoryId: catIds.SuperCup, supplierId: '', image: '', salePrice: 230, costPrice: 69, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Sprinkle Super Cup', description: '', categoryId: catIds.SuperCup, supplierId: '', image: '', salePrice: 200, costPrice: 60, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Brownie Super Cup', description: '', categoryId: catIds.SuperCup, supplierId: '', image: '', salePrice: 250, costPrice: 75, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Super Nutty Cup', description: '', categoryId: catIds.SuperCup, supplierId: '', image: '', salePrice: 250, costPrice: 75, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Choco Dip Cup', description: '', categoryId: catIds.SuperCup, supplierId: '', image: '', salePrice: 250, costPrice: 75, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Choco Nutty Cup', description: '', categoryId: catIds.SuperCup, supplierId: '', image: '', salePrice: 250, costPrice: 75, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Oreo Cup', description: '', categoryId: catIds.SuperCup, supplierId: '', image: '', salePrice: 250, costPrice: 75, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Vanilla Super Cup', description: '', categoryId: catIds.SuperCup, supplierId: '', image: '', salePrice: 150, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Waffle Dip Cone in Cup', description: '', categoryId: catIds.SuperCup, supplierId: '', image: '', salePrice: 220, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Standard Super Cup', description: '', categoryId: catIds.SuperCup, supplierId: '', image: '', salePrice: 230, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Sprinkle Super Cup', description: '', categoryId: catIds.SuperCup, supplierId: '', image: '', salePrice: 200, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Brownie Super Cup', description: '', categoryId: catIds.SuperCup, supplierId: '', image: '', salePrice: 250, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Super Nutty Cup', description: '', categoryId: catIds.SuperCup, supplierId: '', image: '', salePrice: 250, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Choco Dip Cup', description: '', categoryId: catIds.SuperCup, supplierId: '', image: '', salePrice: 250, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Choco Nutty Cup', description: '', categoryId: catIds.SuperCup, supplierId: '', image: '', salePrice: 250, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Oreo Cup', description: '', categoryId: catIds.SuperCup, supplierId: '', image: '', salePrice: 250, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
     // KIDS CUP,
-    { id: uid(), name: 'Bunty Kids Cup', description: '', categoryId: catIds.KidsCup, supplierId: '', image: '', salePrice: 200, costPrice: 60, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Sprinkle Kids Cup', description: '', categoryId: catIds.KidsCup, supplierId: '', image: '', salePrice: 200, costPrice: 60, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Chocolate Kids Cup', description: '', categoryId: catIds.KidsCup, supplierId: '', image: '', salePrice: 240, costPrice: 72, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Strawberry Top Kids Cup', description: '', categoryId: catIds.KidsCup, supplierId: '', image: '', salePrice: 240, costPrice: 72, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Oreo Kids Cup', description: '', categoryId: catIds.KidsCup, supplierId: '', image: '', salePrice: 200, costPrice: 60, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Bunty Kids Cup', description: '', categoryId: catIds.KidsCup, supplierId: '', image: '', salePrice: 200, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Sprinkle Kids Cup', description: '', categoryId: catIds.KidsCup, supplierId: '', image: '', salePrice: 200, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Chocolate Kids Cup', description: '', categoryId: catIds.KidsCup, supplierId: '', image: '', salePrice: 240, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Strawberry Top Kids Cup', description: '', categoryId: catIds.KidsCup, supplierId: '', image: '', salePrice: 240, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Oreo Kids Cup', description: '', categoryId: catIds.KidsCup, supplierId: '', image: '', salePrice: 200, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
     // BOBA CUP,
-    { id: uid(), name: 'Blueberry Boba', description: '', categoryId: catIds.Boba, supplierId: '', image: '', salePrice: 300, costPrice: 90, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'PineApple Boba', description: '', categoryId: catIds.Boba, supplierId: '', image: '', salePrice: 300, costPrice: 90, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Lychee Boba', description: '', categoryId: catIds.Boba, supplierId: '', image: '', salePrice: 300, costPrice: 90, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Strawberry Boba', description: '', categoryId: catIds.Boba, supplierId: '', image: '', salePrice: 300, costPrice: 90, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Mango Boba', description: '', categoryId: catIds.Boba, supplierId: '', image: '', salePrice: 300, costPrice: 90, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Blueberry Boba', description: '', categoryId: catIds.Boba, supplierId: '', image: '', salePrice: 300, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'PineApple Boba', description: '', categoryId: catIds.Boba, supplierId: '', image: '', salePrice: 300, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Lychee Boba', description: '', categoryId: catIds.Boba, supplierId: '', image: '', salePrice: 300, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Strawberry Boba', description: '', categoryId: catIds.Boba, supplierId: '', image: '', salePrice: 300, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Mango Boba', description: '', categoryId: catIds.Boba, supplierId: '', image: '', salePrice: 300, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
     // SLUSH,
-    { id: uid(), name: 'Mango Slush Small', description: '', categoryId: catIds.Slush, supplierId: '', image: '', salePrice: 150, costPrice: 45, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Mango Slush Large', description: '', categoryId: catIds.Slush, supplierId: '', image: '', salePrice: 200, costPrice: 60, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Rainbow Slush Small', description: '', categoryId: catIds.Slush, supplierId: '', image: '', salePrice: 150, costPrice: 45, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Rainbow Slush Large', description: '', categoryId: catIds.Slush, supplierId: '', image: '', salePrice: 200, costPrice: 60, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Blueberry Slush Small', description: '', categoryId: catIds.Slush, supplierId: '', image: '', salePrice: 150, costPrice: 45, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Blueberry Slush Large', description: '', categoryId: catIds.Slush, supplierId: '', image: '', salePrice: 200, costPrice: 60, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Strawberry Slush Small', description: '', categoryId: catIds.Slush, supplierId: '', image: '', salePrice: 150, costPrice: 45, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Strawberry Slush Large', description: '', categoryId: catIds.Slush, supplierId: '', image: '', salePrice: 200, costPrice: 60, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Slush with Ice Cream Small', description: '', categoryId: catIds.Slush, supplierId: '', image: '', salePrice: 250, costPrice: 75, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Slush with Ice Cream Large', description: '', categoryId: catIds.Slush, supplierId: '', image: '', salePrice: 300, costPrice: 90, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Mango Slush Small', description: '', categoryId: catIds.Slush, supplierId: '', image: '', salePrice: 150, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Mango Slush Large', description: '', categoryId: catIds.Slush, supplierId: '', image: '', salePrice: 200, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Rainbow Slush Small', description: '', categoryId: catIds.Slush, supplierId: '', image: '', salePrice: 150, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Rainbow Slush Large', description: '', categoryId: catIds.Slush, supplierId: '', image: '', salePrice: 200, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Blueberry Slush Small', description: '', categoryId: catIds.Slush, supplierId: '', image: '', salePrice: 150, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Blueberry Slush Large', description: '', categoryId: catIds.Slush, supplierId: '', image: '', salePrice: 200, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Strawberry Slush Small', description: '', categoryId: catIds.Slush, supplierId: '', image: '', salePrice: 150, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Strawberry Slush Large', description: '', categoryId: catIds.Slush, supplierId: '', image: '', salePrice: 200, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Slush with Ice Cream Small', description: '', categoryId: catIds.Slush, supplierId: '', image: '', salePrice: 250, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Slush with Ice Cream Large', description: '', categoryId: catIds.Slush, supplierId: '', image: '', salePrice: 300, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
     // SODA,
-    { id: uid(), name: 'Cocktail Soda Small', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 170, costPrice: 51, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Cocktail Soda Large', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 200, costPrice: 60, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Lemon Soda Small', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 170, costPrice: 51, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Lemon Soda Large', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 200, costPrice: 60, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Blueberry Soda Small', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 170, costPrice: 51, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Blueberry Soda Large', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 200, costPrice: 60, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Mix Berry Soda Small', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 170, costPrice: 51, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Mix Berry Soda Large', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 200, costPrice: 60, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Green Apple Soda Small', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 170, costPrice: 51, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Green Apple Soda Large', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 200, costPrice: 60, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Pine Apple Soda Small', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 170, costPrice: 51, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Pine Apple Soda Large', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 200, costPrice: 60, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Strawberry Soda Small', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 170, costPrice: 51, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Strawberry Soda Large', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 200, costPrice: 60, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Falsa Soda Small', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 170, costPrice: 51, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Falsa Soda Large', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 200, costPrice: 60, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Annar Soda Small', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 170, costPrice: 51, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Annar Soda Large', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 200, costPrice: 60, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Mango Soda Small', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 170, costPrice: 51, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Mango Soda Large', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 200, costPrice: 60, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Orange Soda Small', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 170, costPrice: 51, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Orange Soda Large', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 200, costPrice: 60, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Peach Soda Small', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 170, costPrice: 51, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Peach Soda Large', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 200, costPrice: 60, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Imli Soda Small', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 170, costPrice: 51, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Imli Soda Large', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 200, costPrice: 60, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Lychee Soda Small', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 170, costPrice: 51, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Lychee Soda Large', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 200, costPrice: 60, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Khata Metha Soda Small', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 170, costPrice: 51, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Khata Metha Soda Large', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 200, costPrice: 60, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Mango Masala Soda Small', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 170, costPrice: 51, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Mango Masala Soda Large', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 200, costPrice: 60, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Salted Lemon Soda Small', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 170, costPrice: 51, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Salted Lemon Soda Large', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 200, costPrice: 60, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Diet Lemon Soda Small', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 170, costPrice: 51, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Diet Lemon Soda Large', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 200, costPrice: 60, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Pakola Soda Small', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 170, costPrice: 51, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Pakola Soda Large', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 200, costPrice: 60, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Cocktail Soda Small', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 170, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Cocktail Soda Large', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 200, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Lemon Soda Small', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 170, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Lemon Soda Large', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 200, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Blueberry Soda Small', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 170, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Blueberry Soda Large', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 200, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Mix Berry Soda Small', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 170, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Mix Berry Soda Large', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 200, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Green Apple Soda Small', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 170, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Green Apple Soda Large', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 200, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Pine Apple Soda Small', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 170, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Pine Apple Soda Large', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 200, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Strawberry Soda Small', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 170, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Strawberry Soda Large', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 200, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Falsa Soda Small', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 170, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Falsa Soda Large', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 200, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Annar Soda Small', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 170, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Annar Soda Large', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 200, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Mango Soda Small', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 170, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Mango Soda Large', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 200, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Orange Soda Small', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 170, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Orange Soda Large', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 200, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Peach Soda Small', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 170, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Peach Soda Large', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 200, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Imli Soda Small', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 170, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Imli Soda Large', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 200, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Lychee Soda Small', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 170, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Lychee Soda Large', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 200, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Khata Metha Soda Small', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 170, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Khata Metha Soda Large', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 200, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Mango Masala Soda Small', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 170, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Mango Masala Soda Large', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 200, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Salted Lemon Soda Small', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 170, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Salted Lemon Soda Large', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 200, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Diet Lemon Soda Small', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 170, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Diet Lemon Soda Large', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 200, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Pakola Soda Small', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 170, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Pakola Soda Large', description: '', categoryId: catIds.Soda, supplierId: '', image: '', salePrice: 200, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
     // PREMIUM SODA,
-    { id: uid(), name: 'Imli Alubukhara Small', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 250, costPrice: 75, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Imli Alubukhara Large', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 300, costPrice: 90, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Zeera Masala Small', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 250, costPrice: 75, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Zeera Masala Large', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 300, costPrice: 90, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Ginger Lemon Small', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 250, costPrice: 75, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Ginger Lemon Large', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 300, costPrice: 90, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Strawberry Lime Small', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 250, costPrice: 75, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Strawberry Lime Large', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 300, costPrice: 90, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Blue Ocean Small', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 250, costPrice: 75, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Blue Ocean Large', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 300, costPrice: 90, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Chili Mili Small', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 250, costPrice: 75, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Chili Mili Large', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 300, costPrice: 90, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Red Bull Small', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 250, costPrice: 75, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Red Bull Large', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 300, costPrice: 90, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Peachiano Small', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 250, costPrice: 75, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Peachiano Large', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 300, costPrice: 90, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Mint Margarita Small', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 250, costPrice: 75, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Mint Margarita Large', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 300, costPrice: 90, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Mint Lemon Small', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 250, costPrice: 75, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Mint Lemon Large', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 300, costPrice: 90, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Mint Mojito Small', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 250, costPrice: 75, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Mint Mojito Large', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 300, costPrice: 90, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Whiskeo Small', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 250, costPrice: 75, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Whiskeo Large', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 300, costPrice: 90, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Fruite Beer Small', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 250, costPrice: 75, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Fruite Beer Large', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 300, costPrice: 90, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Hajama Small', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 250, costPrice: 75, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Hajama Large', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 300, costPrice: 90, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Black Currant Small', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 250, costPrice: 75, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Black Currant Large', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 300, costPrice: 90, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Salted Lemon Orange Small', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 250, costPrice: 75, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Salted Lemon Orange Large', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 300, costPrice: 90, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Diet Lemon Masala Small', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 250, costPrice: 75, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Diet Lemon Masala Large', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 300, costPrice: 90, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Diet Ginger Lemon Small', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 250, costPrice: 75, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Diet Ginger Lemon Large', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 300, costPrice: 90, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Diet Zeera Small', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 250, costPrice: 75, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Diet Zeera Large', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 300, costPrice: 90, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Imli Alubukhara Small', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 250, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Imli Alubukhara Large', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 300, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Zeera Masala Small', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 250, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Zeera Masala Large', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 300, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Ginger Lemon Small', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 250, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Ginger Lemon Large', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 300, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Strawberry Lime Small', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 250, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Strawberry Lime Large', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 300, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Blue Ocean Small', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 250, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Blue Ocean Large', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 300, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Chili Mili Small', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 250, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Chili Mili Large', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 300, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Red Bull Small', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 250, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Red Bull Large', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 300, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Peachiano Small', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 250, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Peachiano Large', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 300, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Mint Margarita Small', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 250, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Mint Margarita Large', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 300, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Mint Lemon Small', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 250, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Mint Lemon Large', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 300, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Mint Mojito Small', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 250, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Mint Mojito Large', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 300, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Whiskeo Small', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 250, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Whiskeo Large', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 300, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Fruite Beer Small', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 250, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Fruite Beer Large', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 300, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Hajama Small', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 250, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Hajama Large', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 300, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Black Currant Small', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 250, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Black Currant Large', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 300, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Salted Lemon Orange Small', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 250, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Salted Lemon Orange Large', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 300, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Diet Lemon Masala Small', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 250, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Diet Lemon Masala Large', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 300, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Diet Ginger Lemon Small', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 250, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Diet Ginger Lemon Large', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 300, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Diet Zeera Small', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 250, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Diet Zeera Large', description: '', categoryId: catIds.PremiumSoda, supplierId: '', image: '', salePrice: 300, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
     // MILK SODA,
-    { id: uid(), name: 'Chocolate Milk Soda Small', description: '', categoryId: catIds.MilkSoda, supplierId: '', image: '', salePrice: 250, costPrice: 75, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Chocolate Milk Soda Large', description: '', categoryId: catIds.MilkSoda, supplierId: '', image: '', salePrice: 300, costPrice: 90, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Strawberry Milk Soda Small', description: '', categoryId: catIds.MilkSoda, supplierId: '', image: '', salePrice: 250, costPrice: 75, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Strawberry Milk Soda Large', description: '', categoryId: catIds.MilkSoda, supplierId: '', image: '', salePrice: 300, costPrice: 90, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Pakola Milk Soda Small', description: '', categoryId: catIds.MilkSoda, supplierId: '', image: '', salePrice: 250, costPrice: 75, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Pakola Milk Soda Large', description: '', categoryId: catIds.MilkSoda, supplierId: '', image: '', salePrice: 300, costPrice: 90, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Chocolate Milk Soda Small', description: '', categoryId: catIds.MilkSoda, supplierId: '', image: '', salePrice: 250, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Chocolate Milk Soda Large', description: '', categoryId: catIds.MilkSoda, supplierId: '', image: '', salePrice: 300, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Strawberry Milk Soda Small', description: '', categoryId: catIds.MilkSoda, supplierId: '', image: '', salePrice: 250, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Strawberry Milk Soda Large', description: '', categoryId: catIds.MilkSoda, supplierId: '', image: '', salePrice: 300, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Pakola Milk Soda Small', description: '', categoryId: catIds.MilkSoda, supplierId: '', image: '', salePrice: 250, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Pakola Milk Soda Large', description: '', categoryId: catIds.MilkSoda, supplierId: '', image: '', salePrice: 300, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
     // COFFEE & TEA,
-    { id: uid(), name: 'Cappuccino', description: '', categoryId: catIds.Coffee, supplierId: '', image: '', salePrice: 350, costPrice: 105, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Latte', description: '', categoryId: catIds.Coffee, supplierId: '', image: '', salePrice: 380, costPrice: 114, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Mocha', description: '', categoryId: catIds.Coffee, supplierId: '', image: '', salePrice: 400, costPrice: 120, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Hot Chocolate', description: '', categoryId: catIds.Coffee, supplierId: '', image: '', salePrice: 400, costPrice: 120, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Plain Tea', description: '', categoryId: catIds.Coffee, supplierId: '', image: '', salePrice: 30, costPrice: 9, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Kashmiri Tea', description: '', categoryId: catIds.Coffee, supplierId: '', image: '', salePrice: 50, costPrice: 15, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Cardamom Tea', description: '', categoryId: catIds.Coffee, supplierId: '', image: '', salePrice: 50, costPrice: 15, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Cappuccino', description: '', categoryId: catIds.Coffee, supplierId: '', image: '', salePrice: 350, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Latte', description: '', categoryId: catIds.Coffee, supplierId: '', image: '', salePrice: 380, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Mocha', description: '', categoryId: catIds.Coffee, supplierId: '', image: '', salePrice: 400, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Hot Chocolate', description: '', categoryId: catIds.Coffee, supplierId: '', image: '', salePrice: 400, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Plain Tea', description: '', categoryId: catIds.Coffee, supplierId: '', image: '', salePrice: 30, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Kashmiri Tea', description: '', categoryId: catIds.Coffee, supplierId: '', image: '', salePrice: 50, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Cardamom Tea', description: '', categoryId: catIds.Coffee, supplierId: '', image: '', salePrice: 50, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
     // COLD COFFEE,
-    { id: uid(), name: 'Caramel Cold Coffee', description: '', categoryId: catIds.ColdCoffee, supplierId: '', image: '', salePrice: 560, costPrice: 168, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Chocolate Cold Coffee', description: '', categoryId: catIds.ColdCoffee, supplierId: '', image: '', salePrice: 560, costPrice: 168, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Cold Coffee with Ice Cream', description: '', categoryId: catIds.ColdCoffee, supplierId: '', image: '', salePrice: 600, costPrice: 180, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Vanilla Cold Coffee', description: '', categoryId: catIds.ColdCoffee, supplierId: '', image: '', salePrice: 540, costPrice: 162, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Caramel Cold Coffee', description: '', categoryId: catIds.ColdCoffee, supplierId: '', image: '', salePrice: 560, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Chocolate Cold Coffee', description: '', categoryId: catIds.ColdCoffee, supplierId: '', image: '', salePrice: 560, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Cold Coffee with Ice Cream', description: '', categoryId: catIds.ColdCoffee, supplierId: '', image: '', salePrice: 600, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Vanilla Cold Coffee', description: '', categoryId: catIds.ColdCoffee, supplierId: '', image: '', salePrice: 540, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
     // EXTRAS,
     // GOLDEN PREMIUM (premium scoops: Lotus, Nutella, Tutti Fruti),
-    { id: uid(), name: 'Golden Premium Small', description: '', categoryId: catIds.GoldenPremium, supplierId: '', image: '', salePrice: 300, costPrice: 90, vat: 0, isIceCream: true, maxScoops: 2, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Golden Premium Medium', description: '', categoryId: catIds.GoldenPremium, supplierId: '', image: '', salePrice: 400, costPrice: 120, vat: 0, isIceCream: true, maxScoops: 3, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Golden Premium Large', description: '', categoryId: catIds.GoldenPremium, supplierId: '', image: '', salePrice: 500, costPrice: 150, vat: 0, isIceCream: true, maxScoops: 4, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Golden Premium One Scoop', description: '', categoryId: catIds.GoldenPremium, supplierId: '', image: '', salePrice: 220, costPrice: 66, vat: 0, isIceCream: true, maxScoops: 1, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Golden Premium Half Liter', description: '', categoryId: catIds.GoldenPremium, supplierId: '', image: '', salePrice: 1100, costPrice: 330, vat: 0, isIceCream: true, maxScoops: 6, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Golden Premium Full Liter', description: '', categoryId: catIds.GoldenPremium, supplierId: '', image: '', salePrice: 2200, costPrice: 660, vat: 0, isIceCream: true, maxScoops: 10, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Golden Premium Small', description: '', categoryId: catIds.GoldenPremium, supplierId: '', image: '', salePrice: 300, costPrice: 0, vat: 0, isIceCream: true, maxScoops: 2, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Golden Premium Medium', description: '', categoryId: catIds.GoldenPremium, supplierId: '', image: '', salePrice: 400, costPrice: 0, vat: 0, isIceCream: true, maxScoops: 3, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Golden Premium Large', description: '', categoryId: catIds.GoldenPremium, supplierId: '', image: '', salePrice: 500, costPrice: 0, vat: 0, isIceCream: true, maxScoops: 4, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Golden Premium One Scoop', description: '', categoryId: catIds.GoldenPremium, supplierId: '', image: '', salePrice: 220, costPrice: 0, vat: 0, isIceCream: true, maxScoops: 1, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Golden Premium Half Liter', description: '', categoryId: catIds.GoldenPremium, supplierId: '', image: '', salePrice: 1100, costPrice: 0, vat: 0, isIceCream: true, maxScoops: 6, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Golden Premium Full Liter', description: '', categoryId: catIds.GoldenPremium, supplierId: '', image: '', salePrice: 2200, costPrice: 0, vat: 0, isIceCream: true, maxScoops: 10, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
     // EXTRAS,
-    { id: uid(), name: 'Extra Topping', description: '', categoryId: catIds.Extras, supplierId: '', image: '', salePrice: 50, costPrice: 15, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Extra Topping Scoop', description: '', categoryId: catIds.Extras, supplierId: '', image: '', salePrice: 60, costPrice: 18, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Extra Topping Delights', description: '', categoryId: catIds.Extras, supplierId: '', image: '', salePrice: 120, costPrice: 36, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
-    { id: uid(), name: 'Extra Topping Special', description: '', categoryId: catIds.Extras, supplierId: '', image: '', salePrice: 100, costPrice: 30, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] }
+    { id: uid(), name: 'Extra Topping', description: '', categoryId: catIds.Extras, supplierId: '', image: '', salePrice: 50, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Extra Topping Scoop', description: '', categoryId: catIds.Extras, supplierId: '', image: '', salePrice: 60, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Extra Topping Delights', description: '', categoryId: catIds.Extras, supplierId: '', image: '', salePrice: 120, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] },
+    { id: uid(), name: 'Extra Topping Special', description: '', categoryId: catIds.Extras, supplierId: '', image: '', salePrice: 100, costPrice: 0, vat: 0, isIceCream: false, maxScoops: 0, available: true, stock: null, minStock: 5, createdAt: now, priceHistory: [] }
   ]);
 
   // Apply default product images by name from the snapshot
@@ -1838,18 +1851,18 @@ function resetAndReload() {
 window.resetPasswordsToDefault = function() {
   const cfg = LS.get('tpv_config') || {};
   if (!cfg.users) cfg.users = [];
-  const defaults = { Admin: '1234', Sarah: '1234', James: '1234' };
-  cfg.users.forEach(u => {
-    if (defaults[u.name]) u.password = defaults[u.name];
-  });
-  // Make sure all standard accounts exist
-  ['Admin','Sarah','James'].forEach(name => {
-    if (!cfg.users.find(u => u.name === name)) {
-      cfg.users.push({ id: uid(), name, role: name === 'Admin' ? 'admin' : 'cashier', password: '1234', active: true });
-    }
+  const standard = [
+    { id: '58d037d0-f673-40e1-8836-40133e390496', name: 'DUA', role: 'admin', password: 'Dua20' },
+    { id: '87310e63-0aff-4e71-bb78-f0ff54cb880d', name: 'ADNAN MANAGER', role: 'cashier', password: 'ADNAN123' },
+    { id: '8798c275-54ec-4594-b558-44dac3b19eb9', name: 'NUMAN MANAGER', role: 'cashier', password: 'NUMAN123' }
+  ];
+  standard.forEach(s => {
+    const existing = cfg.users.find(u => u.name === s.name || u.id === s.id);
+    if (existing) { existing.password = s.password; existing.active = true; }
+    else cfg.users.push({ ...s, active: true });
   });
   LS.set('tpv_config', cfg);
-  alert('All passwords reset to: 1234\n\nPlease type 1234 in the password field and click Login.');
+  alert('Passwords restored:\n\nDUA → Dua20\nADNAN MANAGER → ADNAN123\nNUMAN MANAGER → NUMAN123');
   document.getElementById('login-password').value = '';
   document.getElementById('login-password').focus();
   document.getElementById('login-error').style.display = 'none';
@@ -2383,6 +2396,11 @@ function navigate(page) {
   if (page === 'pos') {
     posPage.style.display = 'flex';
     contentPage.style.display = 'none';
+    // Don't resume a transient drill-down screen after leaving POS
+    if (state.posView === 'sizes' || state.posView === 'flavors') {
+      state.posView = 'categories';
+      state.sizeGroup = null; state.flavorProduct = null; state.flavorScoops = [];
+    }
     renderPOS();
   } else {
     posPage.style.display = 'none';
@@ -2411,12 +2429,32 @@ function toggleSubmenu(id) {
 function renderPOS() {
   if (state.posView === 'categories') {
     renderCategoryCards();
+  } else if (state.posView === 'sizes') {
+    renderSizeGrid();
+  } else if (state.posView === 'flavors') {
+    renderFlavorGrid();
   } else {
     renderProductGrid();
   }
   renderCart();
   renderPendingInline();
 }
+
+// Detect a trailing size word (Small/Medium/Large/Regular) in a product name
+const SIZE_WORDS = ['Small','Medium','Large','Regular'];
+function sizeOf(name) {
+  for (const w of SIZE_WORDS) {
+    const re = new RegExp('\\b' + w + '\\b', 'i');
+    if (re.test(name)) return w;
+  }
+  return null;
+}
+function baseName(name) {
+  let n = name;
+  SIZE_WORDS.forEach(w => { n = n.replace(new RegExp('\\s*\\b' + w + '\\b\\s*', 'i'), ' '); });
+  return n.replace(/\s+/g, ' ').trim();
+}
+const SIZE_ORDER = { Small: 1, Medium: 2, Large: 3, Regular: 0 };
 
 function renderPendingInline() {
   const container = document.getElementById('pending-inline');
@@ -2541,7 +2579,24 @@ function renderProductGrid() {
     container.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><div class="empty-state-icon">🍦</div><h3>No products found</h3></div>`;
     return;
   }
-  container.innerHTML = products.map(p => {
+
+  // Group products that come in sizes (Small/Medium/Large) under one card
+  const groups = {};   // base -> [products]
+  const singles = [];  // products with no size variants
+  products.forEach(p => {
+    if (sizeOf(p.name)) {
+      const b = baseName(p.name);
+      (groups[b] = groups[b] || []).push(p);
+    } else {
+      singles.push(p);
+    }
+  });
+  // A "base" with only one variant isn't really a size group — treat as single
+  Object.keys(groups).forEach(b => {
+    if (groups[b].length < 2) { singles.push(groups[b][0]); delete groups[b]; }
+  });
+
+  const cardSingle = p => {
     const cat = cats.find(c => c.id === p.categoryId);
     const thumb = p.image
       ? `<img class="product-img" src="${p.image}" alt="${escHtml(p.name)}">`
@@ -2550,10 +2605,86 @@ function renderProductGrid() {
       ${thumb}
       <div class="product-name">${escHtml(p.name)}</div>
       <div class="product-price">${fmt(p.salePrice)}</div>
-      ${p.isIceCream?`<span class="product-badge badge-ice">🍦 Ice Cream</span>`:''}
+      ${p.isIceCream?`<span class="product-badge badge-ice">🍦 Flavors</span>`:''}
       ${!p.available?`<span class="product-badge badge-out">OUT</span>`:''}
     </div>`;
+  };
+
+  const cardGroup = (base, variants) => {
+    const cat = cats.find(c => c.id === variants[0].categoryId);
+    const minP = Math.min(...variants.map(v => v.salePrice));
+    const thumb = variants[0].image
+      ? `<img class="product-img" src="${variants[0].image}" alt="${escHtml(base)}">`
+      : `<div class="product-emoji" style="background:${cat?.color||'#eee'}20">${cat?.icon||'🥤'}</div>`;
+    return `<div class="product-card" onclick="openSizeGroup('${encodeURIComponent(base)}','${state.activeCategoryFilter}')" title="${escHtml(base)}">
+      ${thumb}
+      <div class="product-name">${escHtml(base)}</div>
+      <div class="product-price">from ${fmt(minP)}</div>
+      <span class="product-badge badge-size">📏 ${variants.length} sizes</span>
+    </div>`;
+  };
+
+  // Render groups first (more visual interest), then singles, in original order-ish
+  let html = '';
+  Object.keys(groups).sort().forEach(b => { html += cardGroup(b, groups[b]); });
+  singles.forEach(p => { html += cardSingle(p); });
+  container.innerHTML = html;
+}
+
+// ---- Size picker screen ----
+function openSizeGroup(baseEnc, catId) {
+  const base = decodeURIComponent(baseEnc);
+  const prods = (LS.get('tpv_products') || []).filter(p =>
+    p.categoryId === catId && sizeOf(p.name) && baseName(p.name) === base && p.available
+  );
+  if (!prods.length) return;
+  prods.sort((a,b) => (SIZE_ORDER[sizeOf(a.name)]||0) - (SIZE_ORDER[sizeOf(b.name)]||0));
+  state.sizeGroup = { base, products: prods };
+  state.posView = 'sizes';
+  renderSizeGrid();
+}
+
+function renderSizeGrid() {
+  const grp = state.sizeGroup;
+  if (!grp) { backToProducts(); return; }
+  const filterBar = document.getElementById('cat-filters');
+  filterBar.style.display = 'flex';
+  filterBar.style.alignItems = 'center';
+  filterBar.style.gap = '10px';
+  filterBar.innerHTML = `<div id="back-bar">
+    <button class="back-btn" onclick="backToProducts()">‹ Back</button>
+    <span class="pos-cat-title">📏 ${escHtml(grp.base)} — choose size</span>
+  </div>`;
+  const container = document.getElementById('product-grid');
+  container.style.gridTemplateColumns = 'repeat(auto-fill, minmax(180px, 1fr))';
+  container.innerHTML = grp.products.map(p => {
+    const sz = sizeOf(p.name) || '';
+    const icon = sz === 'Small' ? '🥤' : sz === 'Medium' ? '🥤' : sz === 'Large' ? '🧋' : '🥤';
+    const dim = sz === 'Small' ? '46px' : sz === 'Medium' ? '60px' : '76px';
+    return `<div class="product-card size-card" onclick="pickSize('${p.id}')" title="${escHtml(p.name)}">
+      <div class="size-icon" style="font-size:${dim}">${icon}</div>
+      <div class="product-name" style="font-size:15px">${sz}</div>
+      <div class="product-price" style="font-size:16px">${fmt(p.salePrice)}</div>
+      ${p.isIceCream?`<span class="product-badge badge-ice">🍦 + Flavors</span>`:''}
+    </div>`;
   }).join('');
+}
+
+function pickSize(productId) {
+  const product = (LS.get('tpv_products') || []).find(p => p.id === productId);
+  if (!product) return;
+  if (product.isIceCream && (product.maxScoops || 0) > 0) {
+    openFlavorScreen(product, 'sizes');
+  } else {
+    pushSimpleToCart(product);
+    backToProducts();
+  }
+}
+
+function backToProducts() {
+  state.posView = 'products';
+  state.sizeGroup = null;
+  renderProductGrid();
 }
 
 function addToCart(productId) {
@@ -2564,20 +2695,115 @@ function addToCart(productId) {
   const products = LS.get('tpv_products') || [];
   const product = products.find(p => p.id === productId);
   if (!product || !product.available) return;
-  if (product.isIceCream) {
-    openFlavorModal(product);
+  if (product.isIceCream && (product.maxScoops || 0) > 0) {
+    openFlavorScreen(product, 'products');
   } else {
-    const existing = state.cart.find(i => i.productId === productId && !i.isIceCream);
-    if (existing) {
-      existing.quantity++;
-      existing.subtotal = existing.unitPrice * existing.quantity;
-    } else {
-      state.cart.push({ id: uid(), productId, name: product.name, quantity: 1, unitPrice: product.salePrice, costPrice: product.costPrice, vat: product.vat, isIceCream: false, scoops: [], subtotal: product.salePrice });
-    }
-    renderCart();
-    animateCartBadge();
-    toast(`${product.name} added`, 'success', 1500);
+    pushSimpleToCart(product);
   }
+}
+
+function pushSimpleToCart(product) {
+  const existing = state.cart.find(i => i.productId === product.id && !i.isIceCream);
+  if (existing) {
+    existing.quantity++;
+    existing.subtotal = existing.unitPrice * existing.quantity;
+  } else {
+    state.cart.push({ id: uid(), productId: product.id, name: product.name, quantity: 1, unitPrice: product.salePrice, costPrice: product.costPrice, vat: product.vat, isIceCream: false, scoops: [], subtotal: product.salePrice });
+  }
+  renderCart();
+  animateCartBadge();
+  toast(`${product.name} added`, 'success', 1500);
+}
+
+// ---- Flavor picker screen (grid of flavor cards, same look as products) ----
+function openFlavorScreen(product, returnTo) {
+  if (!state.activeShift) { addToCart(product.id); return; } // triggers shift modal
+  state.flavorProduct = product;
+  state.flavorScoops = [];
+  state.flavorReturnTo = returnTo || 'products';
+  state.posView = 'flavors';
+  renderFlavorGrid();
+}
+
+function renderFlavorGrid() {
+  const product = state.flavorProduct;
+  if (!product) { backToProducts(); return; }
+  const maxScoops = product.maxScoops || 1;
+  const flavors = (LS.get('tpv_flavors') || []).filter(f => f.available).sort((a,b)=>a.order-b.order);
+  const picked = state.flavorScoops;
+
+  const filterBar = document.getElementById('cat-filters');
+  filterBar.style.display = 'flex';
+  filterBar.style.alignItems = 'center';
+  filterBar.style.gap = '10px';
+  const backTarget = state.flavorReturnTo === 'sizes' ? 'renderSizeGridBack()' : 'backToProducts()';
+  filterBar.innerHTML = `<div id="back-bar">
+    <button class="back-btn" onclick="${backTarget}">‹ Back</button>
+    <span class="pos-cat-title">🍦 ${escHtml(product.name)} — scoop ${Math.min(picked.length+1,maxScoops)} of ${maxScoops}</span>
+  </div>`;
+
+  // Selected scoops chips + actions
+  const chips = picked.length
+    ? `<div class="scoop-chips" style="grid-column:1/-1">${picked.map((s,i)=>`<span class="scoop-chip" style="background:${s.color||'#999'}22;border-color:${s.color||'#999'}"><b>${i+1}.</b> ${escHtml(s.flavorName)} <button onclick="removeScoop(${i})" title="remove">✕</button></span>`).join('')}
+       <button class="btn btn-primary btn-sm" style="margin-left:8px" onclick="finishFlavors()">✓ Add to cart (${picked.length})</button></div>`
+    : `<div style="grid-column:1/-1;color:var(--text-sec);font-size:13px;padding:4px 2px">Tap a flavor for each scoop (max ${maxScoops})</div>`;
+
+  const container = document.getElementById('product-grid');
+  container.style.gridTemplateColumns = 'repeat(auto-fill, minmax(150px, 1fr))';
+  const full = picked.length >= maxScoops;
+  container.innerHTML = chips + flavors.map(f => {
+    const sr = f.scoopsRemaining;
+    const out = (sr !== undefined && sr !== null && sr <= 0);
+    const low = (sr !== undefined && sr !== null && sr > 0 && sr < (f.scoopsPerTub || 50));
+    const disabled = out || full;
+    return `<div class="product-card flavor-card ${disabled?'unavailable':''}" ${disabled?'':`onclick="addScoop('${f.id}')"`} title="${escHtml(f.name)}">
+      <div class="flavor-swatch" style="background:${f.color||'#ccc'}"></div>
+      <div class="product-name">${escHtml(f.name)}</div>
+      ${out?`<span class="product-badge badge-out">OUT</span>`:low?`<span class="product-badge badge-size">${sr} left</span>`:''}
+    </div>`;
+  }).join('');
+}
+
+function addScoop(flavorId) {
+  const product = state.flavorProduct;
+  const maxScoops = product?.maxScoops || 1;
+  const flavor = (LS.get('tpv_flavors') || []).find(f => f.id === flavorId);
+  if (!flavor || state.flavorScoops.length >= maxScoops) return;
+  state.flavorScoops.push({ number: state.flavorScoops.length+1, flavorId, flavorName: flavor.name, color: flavor.color });
+  // Auto-add to cart once all scoops chosen (fast flow for single-scoop items)
+  if (state.flavorScoops.length >= maxScoops) { finishFlavors(); return; }
+  renderFlavorGrid();
+}
+
+function removeScoop(idx) {
+  state.flavorScoops.splice(idx, 1);
+  state.flavorScoops.forEach((s,i) => s.number = i+1);
+  renderFlavorGrid();
+}
+
+function finishFlavors() {
+  const product = state.flavorProduct;
+  if (!product || !state.flavorScoops.length) { toast('Pick at least one flavor', 'error'); return; }
+  const scoops = state.flavorScoops.map((s,i) => ({ number: i+1, flavorId: s.flavorId, flavorName: s.flavorName }));
+  state.cart.push({
+    id: uid(), productId: product.id, name: product.name, quantity: 1,
+    unitPrice: product.salePrice, costPrice: product.costPrice, vat: product.vat,
+    isIceCream: true, scoops, subtotal: product.salePrice
+  });
+  toast(`${product.name} added`, 'success', 1500);
+  state.flavorProduct = null;
+  state.flavorScoops = [];
+  // Return to products grid (one tap to add another)
+  backToProducts();
+  animateCartBadge();
+}
+
+function renderSizeGridBack() {
+  // Return from flavor screen to the size picker it came from
+  state.flavorProduct = null;
+  state.flavorScoops = [];
+  if (state.sizeGroup) { state.posView = 'sizes'; renderSizeGrid(); }
+  else backToProducts();
 }
 
 function openFlavorModal(product) {
@@ -4388,27 +4614,41 @@ function renderPage(page, container) {
 function renderDashboard(container) {
   const sales = LS.get('tpv_sales') || [];
   const todaySales = sales.filter(s => s.status==='completed' && s.date?.startsWith(today()));
-  const todayRev = todaySales.reduce((a,s)=>a+s.total,0);
-  const todayProfit = todaySales.reduce((a,s)=>a+(s.items?.reduce((b,i)=>b+((i.unitPrice-i.costPrice)*i.quantity),0)||0),0);
-  const avgMargin = todaySales.length ? todaySales.reduce((a,s)=>a+(s.items?.reduce((b,i)=>b+margin(i.unitPrice,i.costPrice),0)/Math.max(s.items?.length||1,1)||0),0)/todaySales.length : 0;
 
-  // Last 7 days
+  // Last 7 days window
+  const cutoff7 = new Date(); cutoff7.setDate(cutoff7.getDate()-6);
+  const cutoffStr = cutoff7.toISOString().split('T')[0];
+  const week7Sales = sales.filter(s => s.status==='completed' && s.date >= cutoffStr);
+
+  const weekRev    = week7Sales.reduce((a,s)=>a+s.total,0);
+  const weekProfit = week7Sales.reduce((a,s)=>{
+    if (s.items && s.items.length > 0) return a + s.items.reduce((b,i)=>b+((i.unitPrice-(i.costPrice||0))*i.quantity),0);
+    return a + (s.total||0);
+  },0);
+  const avgMargin  = week7Sales.length ? (weekProfit / Math.max(weekRev,1)) * 100 : 0;
+
+  const todayRev    = todaySales.reduce((a,s)=>a+s.total,0);
+
+  // Last 7 days chart
   const days7 = Array.from({length:7},(_,i)=>{
     const d = new Date(); d.setDate(d.getDate()-6+i);
     const ds = d.toISOString().split('T')[0];
     const dayS = sales.filter(s=>s.status==='completed'&&s.date?.startsWith(ds));
-    return { label: d.toLocaleDateString('en-GB',{weekday:'short'}), rev: dayS.reduce((a,s)=>a+s.total,0) };
+    return { label: d.toLocaleDateString('en-GB',{weekday:'short'}), date: ds, rev: dayS.reduce((a,s)=>a+s.total,0), cnt: dayS.length };
   });
   const maxRev = Math.max(...days7.map(d=>d.rev), 1);
 
-  // Top products
+  // Top days (best selling days in last 7)
+  const topDays = [...days7].filter(d=>d.rev>0).sort((a,b)=>b.rev-a.rev).slice(0,5);
+
+  // Top products from items (if any)
   const prodMap = {};
   sales.filter(s=>s.status==='completed').forEach(s=>{
     s.items?.forEach(i=>{
       if (!prodMap[i.productId]) prodMap[i.productId] = { name:i.name, units:0, rev:0, profit:0 };
       prodMap[i.productId].units += i.quantity;
       prodMap[i.productId].rev += i.subtotal;
-      prodMap[i.productId].profit += (i.unitPrice-i.costPrice)*i.quantity;
+      prodMap[i.productId].profit += (i.unitPrice-(i.costPrice||0))*i.quantity;
     });
   });
   const topProds = Object.values(prodMap).sort((a,b)=>b.rev-a.rev).slice(0,5);
@@ -4430,22 +4670,23 @@ function renderDashboard(container) {
   container.innerHTML = `
     <div class="page-header"><div class="page-title">Dashboard</div><div class="page-sub">${new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</div></div>
     <div class="kpi-grid">
-      <div class="kpi-card"><div class="kpi-label">Today's Revenue</div><div class="kpi-value">${fmt(todayRev)}</div><div class="kpi-sub">${todaySales.length} tickets</div></div>
-      <div class="kpi-card"><div class="kpi-label">Today's Profit</div><div class="kpi-value">${fmt(todayProfit)}</div><div class="kpi-sub">Gross margin</div></div>
-      <div class="kpi-card"><div class="kpi-label">Tickets Today</div><div class="kpi-value">${todaySales.length}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Revenue (7 Days)</div><div class="kpi-value">${fmt(weekRev)}</div><div class="kpi-sub">${week7Sales.length} tickets · Today ${fmt(todayRev)}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Profit (7 Days)</div><div class="kpi-value">${fmt(weekProfit)}</div><div class="kpi-sub">Gross margin</div></div>
+      <div class="kpi-card"><div class="kpi-label">Tickets (7 Days)</div><div class="kpi-value">${week7Sales.length}</div><div class="kpi-sub">Today: ${todaySales.length}</div></div>
       <div class="kpi-card"><div class="kpi-label">Avg Margin</div><div class="kpi-value">${avgMargin.toFixed(1)}%</div></div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
       <div class="card">
         <div class="section-title">📊 Revenue Last 7 Days</div>
         <div class="chart-bar">
-          ${days7.map(d=>`<div class="chart-bar-item" style="height:${Math.max((d.rev/maxRev)*100,4)}%" title="${fmt(d.rev)}"></div>`).join('')}
+          ${days7.map(d=>`<div class="chart-bar-item" style="height:${Math.max((d.rev/maxRev)*100,4)}%" title="${d.date}: ${fmt(d.rev)} · ${d.cnt} tickets"></div>`).join('')}
         </div>
         <div class="chart-labels">${days7.map(d=>`<div class="chart-label">${d.label}</div>`).join('')}</div>
       </div>
       <div class="card">
-        <div class="section-title">🏆 Top Flavors</div>
-        ${topFlavors.length ? topFlavors.map(([name,cnt],i)=>`<div class="flex-between" style="padding:8px 0;border-bottom:1px solid var(--border)"><span>${['🥇','🥈','🥉'][i]} ${escHtml(name)}</span><span style="font-family:'Space Mono',monospace;font-weight:700">${cnt} scoops</span></div>`).join('') : '<div class="empty-state" style="padding:20px"><p>No data yet</p></div>'}
+        <div class="section-title">🏆 Best Days (7-Day)</div>
+        ${topDays.length ? topDays.map((d,i)=>`<div class="flex-between" style="padding:8px 0;border-bottom:1px solid var(--border)"><span>${['🥇','🥈','🥉','4️⃣','5️⃣'][i]} ${d.date}</span><span style="font-family:'Space Mono',monospace;font-weight:700">${fmt(d.rev)} · ${d.cnt}t</span></div>`).join('') : '<div class="empty-state" style="padding:20px"><p>No data yet</p></div>'}
+        ${topFlavors.length ? '<div class="section-title" style="margin-top:12px">🍦 Top Flavors</div>'+topFlavors.map(([name,cnt],i)=>`<div class="flex-between" style="padding:6px 0"><span>${['🥇','🥈','🥉'][i]} ${escHtml(name)}</span><span style="font-family:'Space Mono',monospace">${cnt} scoops</span></div>`).join('') : ''}
         ${lowStock.length?`<div style="margin-top:12px;padding:10px;background:#fff3e0;border-radius:8px;font-size:12px">⚠️ ${lowStock.length} product(s) low on stock</div>`:''}
       </div>
     </div>
@@ -4454,7 +4695,12 @@ function renderDashboard(container) {
       ${topProds.length ? `<div class="table-wrap"><table>
         <thead><tr><th>Product</th><th>Units Sold</th><th>Revenue</th><th>Profit</th></tr></thead>
         <tbody>${topProds.map(p=>`<tr><td>${escHtml(p.name)}</td><td style="font-family:'Space Mono',monospace">${p.units}</td><td style="font-family:'Space Mono',monospace">${fmt(p.rev)}</td><td style="font-family:'Space Mono',monospace;color:var(--accent-green)">${fmt(p.profit)}</td></tr>`).join('')}</tbody>
-      </table></div>` : '<div class="empty-state" style="padding:20px"><p>No sales yet. Make your first sale!</p></div>'}
+      </table></div>` : `<div style="padding:16px;background:var(--bg-sec);border-radius:8px">
+        <div class="table-wrap"><table>
+          <thead><tr><th>Day</th><th>Tickets</th><th>Revenue</th><th>Profit</th></tr></thead>
+          <tbody>${days7.filter(d=>d.rev>0).map(d=>`<tr><td>${d.date}</td><td style="font-family:'Space Mono',monospace">${d.cnt}</td><td style="font-family:'Space Mono',monospace">${fmt(d.rev)}</td><td style="font-family:'Space Mono',monospace;color:var(--accent-green)">${fmt(d.rev)}</td></tr>`).join('')}</tbody>
+        </table></div>
+      </div>`}
     </div>`;
 }
 
@@ -6316,9 +6562,9 @@ function renderSettings(container) {
           </div>
 
           <div style="display:flex;gap:8px;margin-top:18px;flex-wrap:wrap">
-            <button class="btn btn-sm btn-secondary" onclick="NOTIF.show({title:'💰 Test Sale',body:'Rs 450 · 3 items · by Sarah',type:'sale'})">🔔 Test sale</button>
-            <button class="btn btn-sm btn-secondary" onclick="NOTIF.show({title:'🔓 Test Shift Open',body:'Sarah opened shift · Float: Rs 1000',type:'shift-open'})">Test shift open</button>
-            <button class="btn btn-sm btn-secondary" onclick="NOTIF.show({title:'🔒 Test Shift Close',body:'Sarah closed · Rs 8400 · 24 tickets · ✅ Perfect cash',type:'shift-close'})">Test shift close</button>
+            <button class="btn btn-sm btn-secondary" onclick="NOTIF.show({title:'💰 Test Sale',body:'Rs 450 · 3 items · by ADNAN',type:'sale'})">🔔 Test sale</button>
+            <button class="btn btn-sm btn-secondary" onclick="NOTIF.show({title:'🔓 Test Shift Open',body:'ADNAN opened shift · Float: Rs 1000',type:'shift-open'})">Test shift open</button>
+            <button class="btn btn-sm btn-secondary" onclick="NOTIF.show({title:'🔒 Test Shift Close',body:'ADNAN closed · Rs 8400 · 24 tickets · ✅ Perfect cash',type:'shift-close'})">Test shift close</button>
             <button class="btn btn-sm btn-secondary" onclick="NOTIF.show({title:'📊 Test Daily Summary',body:'47 sales · 124 items · Rs 18,450 total',type:'summary'})">Test summary</button>
             <button class="btn btn-sm btn-success" onclick="PUSH.send({title:'📤 Test Push',body:'If you see this with the app CLOSED, push works! 🎉',type:'sale'});toast('Test push sent — close the app/lock the phone to verify','success',5000)">📤 Test push to iPhone</button>
           </div>
@@ -8249,12 +8495,23 @@ window.deleteDiscountCampaign = function(id) {
 function renderReportProfit(container) {
   const sales = (LS.get('tpv_sales')||[]).filter(s=>s.status==='completed');
   const prodMap = {};
-  sales.forEach(s => s.items?.forEach(i => {
-    if (!prodMap[i.name]) prodMap[i.name] = { units:0, revenue:0, cost:0 };
-    prodMap[i.name].units += i.quantity;
-    prodMap[i.name].revenue += i.subtotal;
-    prodMap[i.name].cost += (i.costPrice||0)*i.quantity;
-  }));
+  sales.forEach(s => {
+    if (s.items && s.items.length > 0) {
+      s.items.forEach(i => {
+        if (!prodMap[i.name]) prodMap[i.name] = { units:0, revenue:0, cost:0 };
+        prodMap[i.name].units += i.quantity;
+        prodMap[i.name].revenue += i.subtotal;
+        prodMap[i.name].cost += (i.costPrice||0)*i.quantity;
+      });
+    } else {
+      // Sale has no item detail — count full total as 100% profit
+      const key = '— Sales (no detail)';
+      if (!prodMap[key]) prodMap[key] = { units:0, revenue:0, cost:0 };
+      prodMap[key].units += 1;
+      prodMap[key].revenue += (s.total||0);
+      prodMap[key].cost += 0;
+    }
+  });
   const rows = Object.entries(prodMap).map(([name,d])=>({ name, ...d, profit:d.revenue-d.cost, margin:d.revenue?((d.revenue-d.cost)/d.revenue*100):0 })).sort((a,b)=>b.profit-a.profit);
   const totRev = rows.reduce((a,r)=>a+r.revenue,0);
   const totProfit = rows.reduce((a,r)=>a+r.profit,0);
@@ -8419,12 +8676,12 @@ function migrateGoldenPremium() {
     const prods = LS.get('tpv_products') || [];
     const now = new Date().toISOString();
     const gpProducts = [
-      { name: 'Golden Premium Small', salePrice: 300, costPrice: 90, maxScoops: 2 },
-      { name: 'Golden Premium Medium', salePrice: 400, costPrice: 120, maxScoops: 3 },
-      { name: 'Golden Premium Large', salePrice: 500, costPrice: 150, maxScoops: 4 },
-      { name: 'Golden Premium One Scoop', salePrice: 220, costPrice: 66, maxScoops: 1 },
-      { name: 'Golden Premium Half Liter', salePrice: 1100, costPrice: 330, maxScoops: 6 },
-      { name: 'Golden Premium Full Liter', salePrice: 2200, costPrice: 660, maxScoops: 10 }
+      { name: 'Golden Premium Small', salePrice: 300, costPrice: 0, maxScoops: 2 },
+      { name: 'Golden Premium Medium', salePrice: 400, costPrice: 0, maxScoops: 3 },
+      { name: 'Golden Premium Large', salePrice: 500, costPrice: 0, maxScoops: 4 },
+      { name: 'Golden Premium One Scoop', salePrice: 220, costPrice: 0, maxScoops: 1 },
+      { name: 'Golden Premium Half Liter', salePrice: 1100, costPrice: 0, maxScoops: 6 },
+      { name: 'Golden Premium Full Liter', salePrice: 2200, costPrice: 0, maxScoops: 10 }
     ];
     gpProducts.forEach(gp => {
       if (!prods.find(p => p.name === gp.name)) {
